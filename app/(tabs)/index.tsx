@@ -11,6 +11,7 @@ import {
     ActivityIndicator,
     FlatList,
     Pressable,
+    RefreshControl,
     StyleSheet,
     Text,
     TextInput,
@@ -26,10 +27,17 @@ const SORT_OPTIONS: { key: RecipeSortKey; label: string }[] = [
 ];
 
 export default function RecipesScreen() {
-  const { recipes, loading, error } = useRecipes();
+  const { recipes, loading, error, refresh } = useRecipes();
   const router = useRouter();
   const scheme = useColorScheme() ?? 'light';
   const colors = Colors[scheme];
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refresh();
+    setRefreshing(false);
+  };
 
   const [sortKey, setSortKey] = useState<RecipeSortKey>('created_at');
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
@@ -207,6 +215,14 @@ export default function RecipesScreen() {
         keyExtractor={(item) => item.id ?? item.title}
         renderItem={({ item }) => <RecipeCard recipe={item} />}
         contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={Brand.primary}
+            colors={[Brand.primary]}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyEmoji}>🍳</Text>

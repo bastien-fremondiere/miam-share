@@ -60,6 +60,12 @@ DB_BACKEND=pglite
 # Uncomment and fill the line below ONLY if you want to use an external Postgres:
 # POSTGRES_URL=postgresql://user:pass@localhost:5432/miamshare
 GEMINI_API_KEY=
+
+# Google OAuth client IDs — get from https://console.cloud.google.com
+# See .env.example for setup instructions.
+EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=
 ENVEOF
   warn "⚠️  Created .env.local — set GEMINI_API_KEY to enable AI features"
 fi
@@ -107,6 +113,18 @@ else
   echo "EXPO_PUBLIC_API_URL=http://${LAN_IP}:${API_PORT}" >> .env
 fi
 log "✅ EXPO_PUBLIC_API_URL=http://${LAN_IP}:${API_PORT}"
+
+# ── 3b. Propagate Google OAuth client IDs from .env.local → .env ──────────────
+for VAR in EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID; do
+  VAL="${!VAR:-}"
+  if [[ -n "$VAL" ]]; then
+    if grep -q "^${VAR}=" .env 2>/dev/null; then
+      sed -i "s|^${VAR}=.*|${VAR}=${VAL}|" .env
+    else
+      echo "${VAR}=${VAL}" >> .env
+    fi
+  fi
+done
 
 # ── 4. Start the TypeScript API server in the background ─────────────────────
 log "🚀 Starting API server on :${API_PORT}..."

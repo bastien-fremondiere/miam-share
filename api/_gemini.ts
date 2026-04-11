@@ -5,18 +5,26 @@ import { GoogleGenerativeAI, type GenerationConfig } from '@google/generative-ai
 
 // ── Schema injected into every prompt ─────────────────────────────────────
 
+const INGREDIENT_CATEGORIES = [
+  'viandes', 'poissons', 'produits-laitiers', 'fruits-legumes',
+  'feculents', 'epicerie', 'conserves', 'surgeles', 'autres',
+] as const;
+
 const RECIPE_JSON_SCHEMA = `{
   "title": "string",
   "portions": 6,
   "macros_per_portion": { "kcal": number, "protein": number, "carbs": number, "fat": number },
-  "ingredients": [{ "name": "string", "quantity": number, "unit": "string" }],
+  "ingredients": [{ "name": "string", "quantity": number, "unit": "string", "category": "${INGREDIENT_CATEGORIES.join('" | "')}" }],
   "instructions": ["string"]
 }`;
 
 const SYSTEM_INSTRUCTION = `You are a professional nutritionist and batch-cooking chef.
 CRITICAL OUTPUT RULE: Respond with ONLY valid JSON. No markdown, no code fences, no prose.
 The JSON MUST follow this exact schema — do not add or remove fields:
-${RECIPE_JSON_SCHEMA}`;
+${RECIPE_JSON_SCHEMA}
+
+Each ingredient MUST include a "category" field. Use one of: ${INGREDIENT_CATEGORIES.join(', ')}.
+Pick the most accurate category for each ingredient (e.g. chicken → viandes, rice → feculents, canned beans → conserves, spices → epicerie, yogurt/skyr → produits-laitiers, fresh vegetables → fruits-legumes).`;
 
 // ── Public helpers ─────────────────────────────────────────────────────────
 
@@ -59,7 +67,7 @@ export interface GeminiRecipe {
   title: string;
   portions: 6;
   macros_per_portion: { kcal: number; protein: number; carbs: number; fat: number };
-  ingredients: { name: string; quantity: number; unit: string }[];
+  ingredients: { name: string; quantity: number; unit: string; category?: string }[];
   instructions: string[];
 }
 

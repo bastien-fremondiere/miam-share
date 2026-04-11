@@ -1,5 +1,6 @@
 // services/gemini.ts — Thin client proxy to the Vercel /api/gemini/* functions.
 // The Gemini API key lives ONLY on the server — this file contains no secrets.
+// Pass an accessToken (from Google OAuth) to authenticate requests.
 
 import type { GeminiRecipeResponse } from '@/types/recipe';
 
@@ -9,18 +10,37 @@ const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000').re
 
 /**
  * Analyze raw text or a URL via the Vercel /api/gemini/analyze endpoint.
- * Returns a structured recipe scaled to 6 portions.
  */
-export async function analyzeRecipe(rawText: string): Promise<GeminiRecipeResponse> {
-  return callGemini('/api/gemini/analyze', { text: rawText });
+export async function analyzeRecipe(
+  rawText: string,
+  accessToken?: string | null,
+): Promise<GeminiRecipeResponse> {
+  return callGemini('/api/gemini/analyze', { text: rawText }, accessToken);
 }
 
 /**
- * Generate a new recipe idea via the Vercel /api/gemini/generate endpoint.
- * @param userPrompt - e.g. "High protein chicken dish under 500 kcal"
+ * Generate new recipe ideas via the Vercel /api/gemini/generate endpoint.
+ * Returns `count` distinct recipe suggestions (default 3).
  */
-export async function generateRecipeIdea(userPrompt: string): Promise<GeminiRecipeResponse> {
-  return callGemini('/api/gemini/generate', { prompt: userPrompt });
+export async function generateRecipeIdeas(
+  userPrompt: string,
+  count = 3,
+  accessToken?: string | null,
+): Promise<GeminiRecipeResponse[]> {
+  const calls = Array.from({ length: count }, () =>
+    callGemini('/api/gemini/generate', { prompt: userPrompt }, accessToken),
+  );
+  return Promise.all(calls);
+}
+
+/**
+ * @deprecated Use generateRecipeIdeas instead.
+ */
+export async function generateRecipeIdea(
+  userPrompt: string,
+  accessToken?: string | null,
+): Promise<GeminiRecipeResponse> {
+  return callGemini('/api/gemini/generate', { prompt: userPrompt }, accessToken);
 }
 
 // ── Internal ───────────────────────────────────────────────────────────────
@@ -28,10 +48,14 @@ export async function generateRecipeIdea(userPrompt: string): Promise<GeminiReci
 async function callGemini(
   path: string,
   body: Record<string, string>,
+  accessToken?: string | null,
 ): Promise<GeminiRecipeResponse> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
 

@@ -9,9 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "fr.ohana.miamshare"
     },
     "android": {
+      "package": "fr.ohana.miam_share",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -23,7 +25,11 @@
       "intentFilters": [
         {
           "action": "android.intent.action.SEND",
-          "data": [{ "mimeType": "text/plain" }],
+          "data": [
+            {
+              "mimeType": "text/plain"
+            }
+          ],
           "category": [
             "android.intent.category.DEFAULT",
             "android.intent.category.BROWSABLE"
@@ -48,11 +54,18 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "41dbb825-d20b-4294-8008-004e5be4c254"
+      }
     }
   }
 }

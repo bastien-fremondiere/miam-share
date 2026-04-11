@@ -4,6 +4,7 @@ import { MacroBadge } from '@/components/macro-badge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Brand, Colors } from '@/constants/theme';
 import { useRecipes } from '@/context/recipes-context';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -20,6 +21,7 @@ import {
 export default function RecipeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { recipes, deleteRecipe } = useRecipes();
+  const requireAuth = useRequireAuth();
   const router = useRouter();
   const scheme = useColorScheme() ?? 'light';
   const colors = Colors[scheme];
@@ -40,27 +42,29 @@ export default function RecipeDetailScreen() {
   }
 
   const handleDelete = () => {
-    Alert.alert(
-      'Supprimer la recette',
-      `Êtes-vous sûr de vouloir supprimer "${recipe.title}" ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => {
-            setDeleting(true);
-            try {
-              await deleteRecipe(recipe.id!);
-              router.back();
-            } catch (err) {
-              Alert.alert('Erreur', 'Impossible de supprimer la recette.');
-              setDeleting(false);
-            }
+    requireAuth(() => {
+      Alert.alert(
+        'Supprimer la recette',
+        `Êtes-vous sûr de vouloir supprimer "${recipe.title}" ?`,
+        [
+          { text: 'Annuler', style: 'cancel' },
+          {
+            text: 'Supprimer',
+            style: 'destructive',
+            onPress: async () => {
+              setDeleting(true);
+              try {
+                await deleteRecipe(recipe.id!);
+                router.back();
+              } catch (err) {
+                Alert.alert('Erreur', 'Impossible de supprimer la recette.');
+                setDeleting(false);
+              }
+            },
           },
-        },
-      ],
-    );
+        ],
+      );
+    });
   };
 
   return (

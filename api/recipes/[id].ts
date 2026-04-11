@@ -1,6 +1,7 @@
 // api/recipes/[id].ts — GET · PATCH · DELETE /api/recipes/:id
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireAuth } from '../_auth';
 import { setCors } from '../_cors';
 import { ensureSchema, rowToRecipe, sql } from '../_db';
 
@@ -25,6 +26,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Fetch current record, merge with provided updates, then do a full replace.
     // This avoids dynamic SQL while still supporting partial updates.
     if (req.method === 'PATCH') {
+      const authed = await requireAuth(req, res);
+      if (!authed) return;
       const existing = await sql`SELECT * FROM recipes WHERE id = ${id}`;
       if (existing.rows.length === 0) return res.status(404).json({ error: 'Recipe not found' });
 
@@ -57,6 +60,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ── DELETE ─────────────────────────────────────────────────────────────
     if (req.method === 'DELETE') {
+      const authed = await requireAuth(req, res);
+      if (!authed) return;
       const { rowCount } = await sql`DELETE FROM recipes WHERE id = ${id}`;
       if (rowCount === 0) return res.status(404).json({ error: 'Recipe not found' });
       return res.status(204).end();

@@ -1,10 +1,18 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { Image } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const logoImage = require('@/assets/images/splash-icon.png');
+
+function HeaderLogo() {
+  return <Image source={logoImage} style={{ width: 32, height: 32 }} resizeMode="contain" />;
+}
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -19,6 +27,8 @@ export default function TabLayout() {
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.text,
         headerShown: true,
+        headerLeft: () => <HeaderLogo />,
+        headerLeftContainerStyle: { paddingLeft: 12 },
         tabBarButton: HapticTab,
       }}>
       <Tabs.Screen

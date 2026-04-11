@@ -1,6 +1,7 @@
 // api/recipes/index.ts — GET /api/recipes (list) · POST /api/recipes (create)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireAuth } from '../_auth';
 import { setCors } from '../_cors';
 import { ensureSchema, rowToRecipe, sql } from '../_db';
 
@@ -21,6 +22,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ── POST ───────────────────────────────────────────────────────────────
     if (req.method === 'POST') {
+      const authed = await requireAuth(req, res);
+      if (!authed) return;
       const body = req.body as Record<string, unknown>;
       const { title, portions, macros_per_portion, ingredients, instructions, source_url } = body;
 

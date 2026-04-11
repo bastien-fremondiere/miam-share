@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
+import { AuthProvider } from '@/context/auth-context';
 import { RecipesProvider } from '@/context/recipes-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useShareIntent } from '@/hooks/use-share-intent';
@@ -31,23 +32,25 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <RecipesProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <ShareIntentWatcher />
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="share-handler"
-            options={{ presentation: 'modal', title: 'Analyser une recette' }}
-          />
-          <Stack.Screen
-            name="recipe/[id]"
-            options={{ title: 'Recette', headerBackTitle: 'Retour' }}
-          />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </RecipesProvider>
+    <AuthProvider>
+      <RecipesProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <ShareIntentWatcher />
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="share-handler"
+              options={{ presentation: 'modal', title: 'Analyser une recette' }}
+            />
+            <Stack.Screen
+              name="recipe/[id]"
+              options={{ title: 'Recette', headerBackTitle: 'Retour' }}
+            />
+          </Stack>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </RecipesProvider>
+    </AuthProvider>
   );
 }
 

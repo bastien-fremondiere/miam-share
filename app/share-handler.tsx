@@ -5,6 +5,7 @@ import { MacroBadge } from '@/components/macro-badge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Brand, Colors } from '@/constants/theme';
 import { useRecipes } from '@/context/recipes-context';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { analyzeRecipe } from '@/services/gemini';
 import type { GeminiRecipeResponse } from '@/types/recipe';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -29,6 +30,7 @@ export default function ShareHandlerScreen() {
   const { url } = useLocalSearchParams<{ url?: string }>();
   const router = useRouter();
   const { addRecipe } = useRecipes();
+  const requireAuth = useRequireAuth();
   const scheme = useColorScheme() ?? 'light';
   const colors = Colors[scheme];
 
@@ -67,20 +69,22 @@ export default function ShareHandlerScreen() {
 
   const handleSave = async () => {
     if (!recipe) return;
-    setStep('saving');
-    try {
-      await addRecipe({
-        ...recipe,
-        source_url: rawText.startsWith('http') ? rawText : undefined,
-      });
-      Alert.alert('✅ Recette sauvegardée', `"${recipe.title}" ajoutée à votre collection !`, [
-        { text: 'Voir les recettes', onPress: () => router.replace('/(tabs)/') },
-        { text: 'Fermer', onPress: () => router.back() },
-      ]);
-    } catch (err) {
-      setStep('preview');
-      Alert.alert('Erreur', err instanceof Error ? err.message : 'Impossible de sauvegarder.');
-    }
+    requireAuth(async () => {
+      setStep('saving');
+      try {
+        await addRecipe({
+          ...recipe,
+          source_url: rawText.startsWith('http') ? rawText : undefined,
+        });
+        Alert.alert('✅ Recette sauvegardée', `"${recipe.title}" ajoutée à votre collection !`, [
+          { text: 'Voir les recettes', onPress: () => router.replace('/(tabs)/') },
+          { text: 'Fermer', onPress: () => router.back() },
+        ]);
+      } catch (err) {
+        setStep('preview');
+        Alert.alert('Erreur', err instanceof Error ? err.message : 'Impossible de sauvegarder.');
+      }
+    });
   };
 
   const handleReset = () => {

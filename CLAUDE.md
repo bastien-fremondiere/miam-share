@@ -233,6 +233,16 @@ npx tsc --noEmit
 
 # Deploy backend to Vercel
 vercel deploy
+
+# ── EAS Build (Android) ──────────────────────────────────────────────────
+# Dev build (debug APK for local testing with dev client)
+npm run build:android:dev
+
+# Preview build (release APK for internal testing)
+npm run build:android:preview
+
+# Production build (AAB for Google Play)
+npm run build:android
 ```
 
 ### First-time backend setup
@@ -242,6 +252,28 @@ vercel deploy
 4. Link it to the project → `POSTGRES_URL` is auto-injected
 5. Add `GEMINI_API_KEY` manually in Dashboard → Settings → Environment Variables
 6. Run `vercel dev` locally — it pulls env vars automatically
+
+### First-time EAS Build setup
+1. `npm install -g eas-cli` then `eas login`
+2. `eas build:configure` (auto-links project)
+3. Set secrets so `EXPO_PUBLIC_*` vars are baked into the app binary:
+   ```bash
+   eas secret:create --scope project --name EXPO_PUBLIC_API_URL --value https://your-app.vercel.app
+   eas secret:create --scope project --name EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID --value <your-id>
+   eas secret:create --scope project --name EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID --value <your-id>
+   ```
+4. Build: `eas build --platform android --profile production`
+5. Submit to Play Store: `eas submit --platform android`
+
+### Creating Google OAuth Client IDs
+1. [Google Cloud Console](https://console.cloud.google.com/) → APIs & Credentials
+2. OAuth consent screen → External → add test users
+3. **Android client**: Credentials → Create → OAuth 2.0 → Android
+   - Package: `fr.ohana.miam_share`
+   - SHA-1 (debug): `keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android`
+   - SHA-1 (production): from your upload keystore or Google Play App Signing
+4. **Web client**: Credentials → Create → OAuth 2.0 → Web (needed for token exchange)
+5. Copy IDs into `.env.local` (local dev) or EAS secrets (production builds)
 
 ---
 

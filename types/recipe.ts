@@ -8,11 +8,24 @@ export interface MacrosPerPortion {
   fat: number;     // grams
 }
 
+/** Food categories for shopping list grouping */
+export type IngredientCategory =
+  | 'viandes'
+  | 'poissons'
+  | 'produits-laitiers'
+  | 'fruits-legumes'
+  | 'feculents'
+  | 'epicerie'
+  | 'conserves'
+  | 'surgeles'
+  | 'autres';
+
 /** A single ingredient with scaled quantity */
 export interface Ingredient {
   name: string;
   quantity: number;
   unit: string;
+  category?: IngredientCategory;
 }
 
 /**
@@ -50,6 +63,7 @@ export interface DayMealPlan {
   day: number;       // 1–7
   lunch: Recipe;
   dinner: Recipe;
+  cheat_day?: boolean; // when true, macros are not counted and meals are hidden
 }
 
 /** Full 7-day meal plan */

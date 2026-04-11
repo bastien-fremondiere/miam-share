@@ -67,7 +67,12 @@ export const sql = (strings: TemplateStringsArray, ...values: unknown[]): Promis
   }
 
   const pgUrl = process.env.POSTGRES_URL;
-  if (!pgUrl) return pgliteQuery(strings, values);
+  if (!pgUrl) {
+    if (process.env.VERCEL) {
+      throw new Error('[_db] POSTGRES_URL is not set. Add a Postgres database in the Vercel dashboard.');
+    }
+    return pgliteQuery(strings, values);
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (getPgClient() as any)(strings, ...values).then((result: any) => ({
     rows: Array.from(result) as Record<string, unknown>[],
@@ -101,15 +106,21 @@ export async function ensureSchema(): Promise<void> {
   schemaReady = true;
 }
 
+/** Parse a value that may be a JSON string or already-parsed object/array */
+function parseJsonb<T>(val: unknown): T {
+  if (typeof val === 'string') return JSON.parse(val) as T;
+  return val as T;
+}
+
 /** Map a raw Postgres row → Recipe-shaped plain object */
 export function rowToRecipe(row: Record<string, unknown>) {
   return {
     id: row.id as string,
     title: row.title as string,
     portions: row.portions as 6,
-    macros_per_portion: row.macros_per_portion,
-    ingredients: row.ingredients,
-    instructions: row.instructions,
+    macros_per_portion: parseJsonb(row.macros_per_portion),
+    ingredients: parseJsonb(row.ingredients),
+    instructions: parseJsonb(row.instructions),
     source_url: (row.source_url as string | null) ?? undefined,
     created_at: new Date(row.created_at as string),
     updated_at: new Date(row.updated_at as string),

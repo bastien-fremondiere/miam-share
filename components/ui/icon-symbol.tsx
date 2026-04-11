@@ -43,6 +43,16 @@ const MAPPING = {
   'arrow.clockwise': 'refresh',
   'link': 'link',
   'doc.on.clipboard': 'content-paste',
+  'shuffle': 'shuffle',
+  'moon.stars.fill': 'nights-stay',
+  'fork.knife.circle': 'restaurant',
+  'person.crop.circle': 'account-circle',
+  'person.crop.circle.fill': 'account-circle',
+  'arrow.right.square': 'logout',
+  'sparkles': 'auto-awesome',
+  'calendar.badge.checkmark': 'event-available',
+  'square.and.arrow.up.fill': 'share',
+  'doc.text': 'description',
 } as IconMapping;
 
 /**

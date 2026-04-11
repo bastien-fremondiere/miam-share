@@ -65,10 +65,15 @@ export function generateWeeklyPlan(recipes: Recipe[], goals: MacroGoals): Weekly
 }
 
 /**
- * Compute average daily macros across a weekly plan.
+ * Compute average daily macros across a weekly plan, excluding cheat days.
  */
 export function calculateWeeklyMacroSummary(plan: WeeklyPlan): WeeklyMacroSummary {
-  const totals = plan.reduce(
+  const activeDays = plan.filter((d) => !d.cheat_day);
+  if (activeDays.length === 0) {
+    return { avg_kcal: 0, avg_protein: 0, avg_carbs: 0, avg_fat: 0 };
+  }
+
+  const totals = activeDays.reduce(
     (acc, day) => {
       const l = day.lunch.macros_per_portion;
       const d = day.dinner.macros_per_portion;
@@ -82,7 +87,7 @@ export function calculateWeeklyMacroSummary(plan: WeeklyPlan): WeeklyMacroSummar
     { kcal: 0, protein: 0, carbs: 0, fat: 0 },
   );
 
-  const days = plan.length;
+  const days = activeDays.length;
   return {
     avg_kcal: Math.round(totals.kcal / days),
     avg_protein: Math.round(totals.protein / days),

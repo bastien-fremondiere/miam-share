@@ -7,10 +7,13 @@ const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000').re
 
 // ── Internal helper ────────────────────────────────────────────────────────
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, accessToken?: string | null): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...init?.headers as Record<string, string> };
+  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers,
   });
 
   if (res.status === 204) return undefined as T;
@@ -31,11 +34,12 @@ export async function getRecipes(): Promise<Recipe[]> {
 /** Add a new recipe. Returns the saved recipe (with server-generated id). */
 export async function addRecipe(
   recipe: Omit<Recipe, 'id' | 'created_at' | 'updated_at'>,
+  accessToken?: string | null,
 ): Promise<Recipe> {
   const row = await request<RawRecipe>('/api/recipes', {
     method: 'POST',
     body: JSON.stringify(recipe),
-  });
+  }, accessToken);
   return parseRecipe(row);
 }
 
@@ -43,17 +47,18 @@ export async function addRecipe(
 export async function updateRecipe(
   id: string,
   updates: Partial<Omit<Recipe, 'id' | 'created_at'>>,
+  accessToken?: string | null,
 ): Promise<Recipe> {
   const row = await request<RawRecipe>(`/api/recipes/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify(updates),
-  });
+  }, accessToken);
   return parseRecipe(row);
 }
 
 /** Delete a recipe by id. */
-export async function deleteRecipe(id: string): Promise<void> {
-  await request<void>(`/api/recipes/${encodeURIComponent(id)}`, { method: 'DELETE' });
+export async function deleteRecipe(id: string, accessToken?: string | null): Promise<void> {
+  await request<void>(`/api/recipes/${encodeURIComponent(id)}`, { method: 'DELETE' }, accessToken);
 }
 
 // ── Internal types & parse helper ─────────────────────────────────────────

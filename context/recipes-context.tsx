@@ -19,6 +19,8 @@ import React, {
 } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
+import { useAuth } from './auth-context';
+
 const POLL_INTERVAL_MS = 10_000; // 10-second polling for near-real-time family sync
 
 // ── Context types ──────────────────────────────────────────────────────────
@@ -39,6 +41,7 @@ const RecipesContext = createContext<RecipesContextValue | null>(null);
 // ── Provider ───────────────────────────────────────────────────────────────
 
 export function RecipesProvider({ children }: { children: ReactNode }) {
+  const { accessToken } = useAuth();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,26 +77,26 @@ export function RecipesProvider({ children }: { children: ReactNode }) {
 
   const addRecipe = useCallback(
     async (recipe: Omit<Recipe, 'id' | 'created_at' | 'updated_at'>): Promise<string> => {
-      const saved = await apiAdd(recipe);
+      const saved = await apiAdd(recipe, accessToken);
       // Optimistically insert at top so the UI feels instant
       setRecipes((prev) => [saved, ...prev]);
       return saved.id!;
     },
-    [],
+    [accessToken],
   );
 
   const updateRecipe = useCallback(
     async (id: string, updates: Partial<Omit<Recipe, 'id' | 'created_at'>>): Promise<void> => {
-      const updated = await apiUpdate(id, updates);
+      const updated = await apiUpdate(id, updates, accessToken);
       setRecipes((prev) => prev.map((r) => (r.id === id ? updated : r)));
     },
-    [],
+    [accessToken],
   );
 
   const deleteRecipe = useCallback(async (id: string): Promise<void> => {
-    await apiDelete(id);
+    await apiDelete(id, accessToken);
     setRecipes((prev) => prev.filter((r) => r.id !== id));
-  }, []);
+  }, [accessToken]);
 
   return (
     <RecipesContext.Provider
