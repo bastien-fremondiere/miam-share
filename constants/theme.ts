@@ -1,29 +1,40 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+// ── Brand Palette ──────────────────────────────────────────────────────────
+export const Brand = {
+  /** Warm cooking-fire orange — primary CTA, accents */
+  primary: '#E8652A',
+  /** Herb garden green — success, secondary actions */
+  secondary: '#2D9B52',
+  /** Saffron / golden spice — accent highlight */
+  accent: '#F5A623',
+  /** Soft destructive red */
+  danger: '#E53935',
+} as const;
 
+// ── Semantic Colours (light / dark) ───────────────────────────────────────
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    text: '#1C1C1E',
+    textSecondary: '#6C6C70',
+    background: '#FBF7F4',
+    surface: '#FFFFFF',
+    border: '#E5E5EA',
+    tint: Brand.primary,
+    icon: '#6C6C70',
+    tabIconDefault: '#8E8E93',
+    tabIconSelected: Brand.primary,
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    text: '#F2F2F7',
+    textSecondary: '#AEAEB2',
+    background: '#1C1C1E',
+    surface: '#2C2C2E',
+    border: '#3A3A3C',
+    tint: Brand.primary,
+    icon: '#AEAEB2',
+    tabIconDefault: '#636366',
+    tabIconSelected: Brand.primary,
   },
 };
 

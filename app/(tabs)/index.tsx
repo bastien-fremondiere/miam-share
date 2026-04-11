@@ -1,98 +1,301 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+// app/(tabs)/index.tsx — Recipe list with real-time sync, sort & filter
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import React, { useState, useMemo } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useColorScheme,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { useRecipes } from '@/context/recipes-context';
+import { RecipeCard } from '@/components/recipe-card';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Brand, Colors } from '@/constants/theme';
+import type { RecipeSortKey, SortDirection } from '@/types/recipe';
 
-export default function HomeScreen() {
+const SORT_OPTIONS: { key: RecipeSortKey; label: string }[] = [
+  { key: 'created_at', label: 'Date' },
+  { key: 'protein', label: 'Protéines' },
+  { key: 'kcal', label: 'Calories' },
+  { key: 'title', label: 'Nom' },
+];
+
+export default function RecipesScreen() {
+  const { recipes, loading, error } = useRecipes();
+  const router = useRouter();
+  const scheme = useColorScheme() ?? 'light';
+  const colors = Colors[scheme];
+
+  const [sortKey, setSortKey] = useState<RecipeSortKey>('created_at');
+  const [sortDir, setSortDir] = useState<SortDirection>('desc');
+  const [maxKcal, setMaxKcal] = useState('');
+  const [minProtein, setMinProtein] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  const toggleSort = (key: RecipeSortKey) => {
+    if (key === sortKey) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  };
+
+  const filtered = useMemo(() => {
+    let list = [...recipes];
+
+    if (maxKcal) {
+      const max = parseFloat(maxKcal);
+      if (!isNaN(max)) list = list.filter((r) => r.macros_per_portion.kcal <= max);
+    }
+    if (minProtein) {
+      const min = parseFloat(minProtein);
+      if (!isNaN(min)) list = list.filter((r) => r.macros_per_portion.protein >= min);
+    }
+
+    list.sort((a, b) => {
+      let va: number | string;
+      let vb: number | string;
+
+      switch (sortKey) {
+        case 'kcal':
+          va = a.macros_per_portion.kcal;
+          vb = b.macros_per_portion.kcal;
+          break;
+        case 'protein':
+          va = a.macros_per_portion.protein;
+          vb = b.macros_per_portion.protein;
+          break;
+        case 'carbs':
+          va = a.macros_per_portion.carbs;
+          vb = b.macros_per_portion.carbs;
+          break;
+        case 'fat':
+          va = a.macros_per_portion.fat;
+          vb = b.macros_per_portion.fat;
+          break;
+        case 'title':
+          va = a.title.toLowerCase();
+          vb = b.title.toLowerCase();
+          break;
+        default:
+          va = a.created_at?.getTime() ?? 0;
+          vb = b.created_at?.getTime() ?? 0;
+      }
+
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return list;
+  }, [recipes, sortKey, sortDir, maxKcal, minProtein]);
+
+  if (loading) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={Brand.primary} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+          Chargement des recettes…
+        </Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <IconSymbol name="exclamationmark.triangle" size={40} color={Brand.danger} />
+        <Text style={[styles.errorTitle, { color: colors.text }]}>Erreur de connexion</Text>
+        <Text style={[styles.errorMsg, { color: colors.textSecondary }]}>{error}</Text>
+        <Text style={[styles.errorHint, { color: colors.textSecondary }]}>
+          Vérifiez votre fichier .env et les règles Firestore.
+        </Text>
+      </View>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Sort bar */}
+      <View style={[styles.sortBar, { borderBottomColor: colors.border }]}>
+        <View style={styles.sortButtons}>
+          {SORT_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt.key}
+              onPress={() => toggleSort(opt.key)}
+              style={[
+                styles.sortBtn,
+                sortKey === opt.key && { backgroundColor: Brand.primary + '22' },
+              ]}>
+              <Text
+                style={[
+                  styles.sortBtnText,
+                  { color: sortKey === opt.key ? Brand.primary : colors.textSecondary },
+                ]}>
+                {opt.label}
+                {sortKey === opt.key ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ''}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Pressable onPress={() => setShowFilters((v) => !v)}>
+          <IconSymbol
+            name="line.3.horizontal.decrease"
+            size={22}
+            color={showFilters ? Brand.primary : colors.icon}
+          />
+        </Pressable>
+      </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      {/* Filter inputs */}
+      {showFilters && (
+        <View
+          style={[
+            styles.filterRow,
+            { backgroundColor: colors.surface, borderBottomColor: colors.border },
+          ]}>
+          <View style={styles.filterField}>
+            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Max kcal</Text>
+            <TextInput
+              value={maxKcal}
+              onChangeText={setMaxKcal}
+              keyboardType="numeric"
+              placeholder="ex: 600"
+              placeholderTextColor={colors.textSecondary}
+              style={[
+                styles.filterInput,
+                {
+                  color: colors.text,
+                  borderColor: colors.border,
+                  backgroundColor: colors.background,
+                },
+              ]}
+            />
+          </View>
+          <View style={styles.filterField}>
+            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>
+              Min protéines (g)
+            </Text>
+            <TextInput
+              value={minProtein}
+              onChangeText={setMinProtein}
+              keyboardType="numeric"
+              placeholder="ex: 30"
+              placeholderTextColor={colors.textSecondary}
+              style={[
+                styles.filterInput,
+                {
+                  color: colors.text,
+                  borderColor: colors.border,
+                  backgroundColor: colors.background,
+                },
+              ]}
+            />
+          </View>
+        </View>
+      )}
+
+      {/* Recipe list */}
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => item.id ?? item.title}
+        renderItem={({ item }) => <RecipeCard recipe={item} />}
+        contentContainerStyle={styles.list}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Text style={styles.emptyEmoji}>🍳</Text>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>Aucune recette</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+              Partagez une URL de recette depuis votre navigateur, ou utilisez l'onglet Réflexion
+              pour en générer une.
+            </Text>
+          </View>
+        }
+        ListHeaderComponent={
+          filtered.length > 0 ? (
+            <Text style={[styles.count, { color: colors.textSecondary }]}>
+              {filtered.length} recette{filtered.length > 1 ? 's' : ''}
+            </Text>
+          ) : null
+        }
+      />
+
+      {/* FAB — navigate to share handler for manual entry */}
+      <Pressable
+        style={styles.fab}
+        onPress={() => router.push('/share-handler')}
+        accessibilityLabel="Ajouter une recette">
+        <IconSymbol name="plus" size={28} color="#fff" />
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  loadingText: { marginTop: 12, fontSize: 15 },
+  errorTitle: { fontSize: 18, fontWeight: '600', marginTop: 12 },
+  errorMsg: { marginTop: 6, textAlign: 'center', fontSize: 14 },
+  errorHint: { marginTop: 4, textAlign: 'center', fontSize: 12 },
+
+  sortBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
     gap: 8,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  sortButtons: { flex: 1, flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  sortBtn: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 20 },
+  sortBtnText: { fontSize: 13, fontWeight: '500' },
+
+  filterRow: {
+    flexDirection: 'row',
+    padding: 12,
+    gap: 12,
+    borderBottomWidth: 1,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  filterField: { flex: 1 },
+  filterLabel: { fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
+  filterInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 14,
+  },
+
+  list: { padding: 16, paddingBottom: 100 },
+  count: { fontSize: 13, marginBottom: 8 },
+
+  empty: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 32 },
+  emptyEmoji: { fontSize: 56 },
+  emptyTitle: { fontSize: 20, fontWeight: '600', marginTop: 12 },
+  emptySubtitle: { marginTop: 8, textAlign: 'center', fontSize: 14, lineHeight: 20 },
+
+  fab: {
     position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Brand.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Brand.primary,
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
 });
+

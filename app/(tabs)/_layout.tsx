@@ -8,28 +8,48 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
+        tabBarActiveTintColor: colors.tabIconSelected,
+        tabBarInactiveTintColor: colors.tabIconDefault,
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.text,
+        headerShown: true,
         tabBarButton: HapticTab,
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'Recettes',
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="fork.knife" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="planner"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Planning',
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="calendar" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="reflection"
+        options={{
+          title: 'Réflexion',
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="lightbulb" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="export"
+        options={{
+          title: 'Exporter',
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="doc.richtext" color={color} />,
         }}
       />
     </Tabs>
   );
 }
+
