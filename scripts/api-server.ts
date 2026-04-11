@@ -7,15 +7,19 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 
-import express from 'express';
-import type { Request, Response } from 'express';
+if (!process.env.DB_BACKEND && !process.env.POSTGRES_URL) {
+  process.env.DB_BACKEND = 'pglite';
+}
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { Request, Response } from 'express';
+import express from 'express';
 
 // Route handlers (imported after env is set up)
-import recipesIndex from '../api/recipes/index';
-import recipesId from '../api/recipes/[id]';
 import geminiAnalyze from '../api/gemini/analyze';
 import geminiGenerate from '../api/gemini/generate';
+import recipesId from '../api/recipes/[id]';
+import recipesIndex from '../api/recipes/index';
 
 const app = express();
 app.use(express.json());
@@ -37,7 +41,19 @@ app.all('/api/recipes/:id', (req, res) => {
 app.all('/api/gemini/analyze', adapt(geminiAnalyze));
 app.all('/api/gemini/generate', adapt(geminiGenerate));
 
-const PORT = Number(process.env.PORT ?? 3000);
+function resolvePort(): number {
+  const argIndex = process.argv.indexOf('--port');
+  if (argIndex >= 0 && process.argv[argIndex + 1]) {
+    const parsed = Number(process.argv[argIndex + 1]);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  const envPort = Number(process.env.PORT ?? 3000);
+  if (Number.isFinite(envPort) && envPort > 0) return envPort;
+  return 3000;
+}
+
+const PORT = resolvePort();
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n🍽  Miam Share API  →  http://0.0.0.0:${PORT}\n`);
+  console.log(`\n🍽  Miam Share API  →  http://0.0.0.0:${PORT} (${process.env.DB_BACKEND ?? 'auto'})\n`);
 });

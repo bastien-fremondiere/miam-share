@@ -1,37 +1,79 @@
 // api/_db.ts — Postgres connection + schema bootstrap
-// Uses the 'postgres' npm package which works with:
-//   - Local Docker Postgres (dev.sh)
-//   - Vercel Postgres / Neon (production, via POSTGRES_URL)
+//
+// Two backends, selected automatically:
+//   POSTGRES_URL set   → 'postgres' npm package (Vercel Neon in prod, or local Docker)
+//   POSTGRES_URL unset → @electric-sql/pglite (embedded Postgres in "./dev-db", no Docker needed)
 
+import type { PGlite } from '@electric-sql/pglite';
 import postgres from 'postgres';
 
-// Lazy singleton — created on first sql call so env vars are read at call time,
-// not at module load time (important for test / seed scripts that configure env first).
-let _client: ReturnType<typeof postgres> | undefined;
+type SqlResult = { rows: Record<string, unknown>[]; rowCount: number };
 
-function getClient(): ReturnType<typeof postgres> {
-  if (!_client) {
-    const url = process.env.POSTGRES_URL;
-    if (!url) throw new Error('POSTGRES_URL environment variable is not set');
-    _client = postgres(url, {
-      // No SSL for localhost; require it for Neon / remote (production)
+// ── PGlite (embedded, local dev only) ─────────────────────────────────────
+let pgliteDb: PGlite | undefined;
+
+async function getPGlite(): Promise<PGlite> {
+  if (!pgliteDb) {
+    // Lazy import: PGlite is a devDependency; this path is never reached in production.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { PGlite } = require('@electric-sql/pglite') as typeof import('@electric-sql/pglite');
+    pgliteDb = new PGlite('./dev-db');
+    await pgliteDb.waitReady;
+  }
+  return pgliteDb;
+}
+
+/** Convert a tagged-template call into a positional ($1, $2…) query for PGlite */
+async function pgliteQuery(strings: TemplateStringsArray, values: unknown[]): Promise<SqlResult> {
+  let text = '';
+  for (let i = 0; i < strings.length; i++) {
+    text += strings[i];
+    if (i < values.length) text += `$${i + 1}`;
+  }
+  const db = await getPGlite();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await db.query(text, values as any[]);
+  return {
+    rows: result.rows as Record<string, unknown>[],
+    rowCount: result.affectedRows ?? result.rows.length,
+  };
+}
+
+// ── postgres package (network Postgres) ─────────────────────────────────────
+let _pgClient: ReturnType<typeof postgres> | undefined;
+
+function getPgClient(): ReturnType<typeof postgres> {
+  const url = process.env.POSTGRES_URL;
+  if (!url) throw new Error('[_db] getPgClient() called but POSTGRES_URL is not set');
+  if (!_pgClient) {
+    _pgClient = postgres(url, {
       ssl: url.includes('localhost') || url.includes('127.0.0.1') ? false : 'require',
     });
   }
-  return _client;
+  return _pgClient;
 }
 
-/**
- * sql tagged-template tag — mimics the @vercel/postgres { rows, rowCount } API
- * so all existing route handlers remain unchanged.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const sql = (strings: TemplateStringsArray, ...values: unknown[]) =>
+// ── Unified sql tagged-template tag ─────────────────────────────────────────
+// Mimics the { rows, rowCount } shape expected by all route handlers.
+export const sql = (strings: TemplateStringsArray, ...values: unknown[]): Promise<SqlResult> => {
+  const forcedBackend = (process.env.DB_BACKEND ?? '').toLowerCase();
+  if (forcedBackend === 'pglite') return pgliteQuery(strings, values);
+  if (forcedBackend === 'postgres') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (getPgClient() as any)(strings, ...values).then((result: any) => ({
+      rows: Array.from(result) as Record<string, unknown>[],
+      rowCount: Number(result.count ?? 0),
+    }));
+  }
+
+  const pgUrl = process.env.POSTGRES_URL;
+  if (!pgUrl) return pgliteQuery(strings, values);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (getClient() as any)(strings, ...values).then((result: any) => ({
+  return (getPgClient() as any)(strings, ...values).then((result: any) => ({
     rows: Array.from(result) as Record<string, unknown>[],
     rowCount: Number(result.count ?? 0),
   }));
+};
 
 // Guard so schema is created at most once per warm function instance
 let schemaReady = false;

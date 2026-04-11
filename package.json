@@ -45,6 +45,7 @@
     "react-native-worklets": "0.5.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.4.4",
     "@types/express": "^5.0.0",
     "@types/react": "~19.1.0",
     "@vercel/node": "^3.2.0",
