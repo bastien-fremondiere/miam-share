@@ -1,9 +1,37 @@
-// api/_db.ts — Vercel Postgres connection + schema bootstrap
-// Uses @vercel/postgres which connects via the POSTGRES_URL env var (set by Vercel dashboard).
+// api/_db.ts — Postgres connection + schema bootstrap
+// Uses the 'postgres' npm package which works with:
+//   - Local Docker Postgres (dev.sh)
+//   - Vercel Postgres / Neon (production, via POSTGRES_URL)
 
-import { sql } from '@vercel/postgres';
+import postgres from 'postgres';
 
-export { sql };
+// Lazy singleton — created on first sql call so env vars are read at call time,
+// not at module load time (important for test / seed scripts that configure env first).
+let _client: ReturnType<typeof postgres> | undefined;
+
+function getClient(): ReturnType<typeof postgres> {
+  if (!_client) {
+    const url = process.env.POSTGRES_URL;
+    if (!url) throw new Error('POSTGRES_URL environment variable is not set');
+    _client = postgres(url, {
+      // No SSL for localhost; require it for Neon / remote (production)
+      ssl: url.includes('localhost') || url.includes('127.0.0.1') ? false : 'require',
+    });
+  }
+  return _client;
+}
+
+/**
+ * sql tagged-template tag — mimics the @vercel/postgres { rows, rowCount } API
+ * so all existing route handlers remain unchanged.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const sql = (strings: TemplateStringsArray, ...values: unknown[]) =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (getClient() as any)(strings, ...values).then((result: any) => ({
+    rows: Array.from(result) as Record<string, unknown>[],
+    rowCount: Number(result.count ?? 0),
+  }));
 
 // Guard so schema is created at most once per warm function instance
 let schemaReady = false;
