@@ -1,25 +1,25 @@
 // app/(tabs)/reflection.tsx — AI recipe generation chat interface
 
-import React, { useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useColorScheme,
-} from 'react-native';
-import { generateRecipeIdea } from '@/services/gemini';
-import { useRecipes } from '@/context/recipes-context';
 import { MacroBadge } from '@/components/macro-badge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Brand, Colors } from '@/constants/theme';
+import { useRecipes } from '@/context/recipes-context';
+import { generateRecipeIdea } from '@/services/gemini';
 import type { GeminiRecipeResponse } from '@/types/recipe';
+import React, { useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+    useColorScheme,
+} from 'react-native';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

@@ -1,8 +1,8 @@
 // components/macro-badge.tsx — A single macro stat pill
 
+import { Brand } from '@/constants/theme';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Brand } from '@/constants/theme';
 
 interface MacroBadgeProps {
   label: string;

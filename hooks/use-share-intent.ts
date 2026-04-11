@@ -1,8 +1,8 @@
 // hooks/use-share-intent.ts — Detect incoming share intent data on Android
 // See CLAUDE.md "Android Share Intent" for notes on limitations.
 
-import { useEffect, useState } from 'react';
 import * as Linking from 'expo-linking';
+import { useEffect, useState } from 'react';
 
 export interface ShareIntentData {
   /** The URL if a URL was shared, otherwise null */

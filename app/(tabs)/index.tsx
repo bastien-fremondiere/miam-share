@@ -1,22 +1,22 @@
 // app/(tabs)/index.tsx — Recipe list with real-time sync, sort & filter
 
-import React, { useState, useMemo } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useColorScheme,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useRecipes } from '@/context/recipes-context';
 import { RecipeCard } from '@/components/recipe-card';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Brand, Colors } from '@/constants/theme';
+import { useRecipes } from '@/context/recipes-context';
 import type { RecipeSortKey, SortDirection } from '@/types/recipe';
+import { useRouter } from 'expo-router';
+import React, { useMemo, useState } from 'react';
+import {
+    ActivityIndicator,
+    FlatList,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+    useColorScheme,
+} from 'react-native';
 
 const SORT_OPTIONS: { key: RecipeSortKey; label: string }[] = [
   { key: 'created_at', label: 'Date' },

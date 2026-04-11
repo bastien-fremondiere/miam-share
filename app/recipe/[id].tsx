@@ -1,21 +1,21 @@
 // app/recipe/[id].tsx — Full recipe detail view
 
-import React, { useState } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useColorScheme,
-  Linking,
-} from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useRecipes } from '@/context/recipes-context';
 import { MacroBadge } from '@/components/macro-badge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Brand, Colors } from '@/constants/theme';
+import { useRecipes } from '@/context/recipes-context';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import {
+    Alert,
+    Linking,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+    useColorScheme,
+} from 'react-native';
 
 export default function RecipeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

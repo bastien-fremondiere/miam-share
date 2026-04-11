@@ -8,69 +8,53 @@
 
 ### Rules
 1. **NEVER** commit `.env` to version control. It is in `.gitignore`.
-2. All secrets use the `EXPO_PUBLIC_` prefix for Expo's build system.
-3. Firebase API keys are restricted by **Android/iOS app signature** in the Google Cloud Console.
-4. Gemini API key must be **restricted to Generative Language API only** in Google Cloud Console.
+2. The mobile app exposes **only one** env var: `EXPO_PUBLIC_API_URL` (the Vercel URL — not a secret).
+3. `GEMINI_API_KEY` lives **exclusively** on the Vercel server. It is never bundled into the mobile app and never prefixed with `EXPO_PUBLIC_`.
+4. Gemini API key should be restricted to **Generative Language API only** in Google Cloud Console.
 
-### Environment Variables
+### Client Environment Variables (mobile app)
 ```
-EXPO_PUBLIC_FIREBASE_API_KEY       # Restricted via HTTP referrers / app check
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN
-EXPO_PUBLIC_FIREBASE_PROJECT_ID
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-EXPO_PUBLIC_FIREBASE_APP_ID
-EXPO_PUBLIC_GEMINI_API_KEY         # Restricted to Generative Language API
+EXPO_PUBLIC_API_URL    # URL of your Vercel deployment — not a secret
 ```
 
-### Note on Client-Side Secrets
-Firebase API keys are designed to be public. Security is enforced through **Firestore Security Rules**, not key secrecy.
-Gemini API keys incur costs — implement rate limiting and monitor usage in Google Cloud Console.
+### Server Environment Variables (Vercel Dashboard only — never in git)
+```
+GEMINI_API_KEY         # Restricted to Generative Language API
+POSTGRES_URL           # Auto-injected by Vercel when Postgres DB is linked
+POSTGRES_URL_NON_POOLING  # Auto-injected by Vercel
+```
+
+### Note on API Security
+Unlike Firebase (where the API key is client-visible and security relies on Firestore rules), the Vercel architecture keeps all secrets server-side. The database is only reachable from Vercel's private network — there is no way for a client to query Postgres directly.
 
 ---
 
-## Firestore Security Rules
+## Vercel Postgres Security
 
-Deploy these rules to Firebase Console → Firestore → Rules before going to production:
-
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Temporary: allow all reads/writes during development
-    // REPLACE with authenticated rules before production:
-    match /recipes/{recipeId} {
-      // Production rule (requires Firebase Auth):
-      // allow read, write: if request.auth != null;
-      
-      // Development rule (open access — NOT for production):
-      allow read, write: if true;
-    }
-  }
-}
-```
-
-**Before going to production**, implement Firebase Authentication and replace `allow read, write: if true` with `allow read, write: if request.auth != null`.
+- The Postgres database is accessible **only** from Vercel's serverless functions via the private connection string. It is not exposed to the public internet.
+- All queries in `api/recipes/` use `@vercel/postgres`'s tagged template literals (`sql\`...\``), which provide **parameterised queries** and prevent SQL injection by design.
+- `ensureSchema()` uses `CREATE TABLE IF NOT EXISTS` — idempotent and safe on every cold start.
+- PATCH uses a fetch-then-replace pattern to avoid dynamic SQL construction.
 
 ---
 
 ## Input Validation
 
-### Gemini Service (services/gemini.ts)
+### Gemini Service (api/_gemini.ts — server-side)
 - All user input sent to Gemini is wrapped in a constrained prompt with explicit JSON schema.
 - `responseMimeType: 'application/json'` prevents Gemini from executing injected instructions as code.
-- `parseGeminiResponse()` validates required fields after parsing — invalid structure throws an error.
+- `parseAndValidate()` strips code fences, validates required fields after parsing, and enforces `portions = 6`.
 - **Prompt injection risk**: User-controlled text is passed as data context, not as instructions. The system prompt establishes the role before user input is included.
 
-### Firebase Service
-- All data written to Firestore comes from Gemini's parsed + validated response.
-- No raw user input is written directly to Firestore without validation.
+### API Endpoints (api/recipes/)
+- All data written to Postgres comes from Gemini's parsed + validated response.
+- No raw user input is written directly to the database without validation.
 - TypeScript strict mode ensures type safety at compile time.
 
 ### Share Intent Handler
 - The URL received from the Android share intent is treated as untrusted input.
-- It is displayed to the user for review before being sent to Gemini.
-- URLs are not fetched directly by the app — Gemini handles content analysis.
+- It is displayed to the user for review before being sent to the Vercel Gemini endpoint.
+- URLs are not fetched directly by the app — the Gemini server handles content analysis.
 
 ---
 
@@ -87,13 +71,13 @@ service cloud.firestore {
 
 | Risk | Status | Notes |
 |---|---|---|
-| A01 Broken Access Control | ⚠️ Dev | Open Firestore rules in dev — see Rules above |
-| A02 Cryptographic Failures | ✅ | No sensitive data stored; HTTPS enforced by Firebase |
-| A03 Injection | ✅ | Gemini prompts use data context pattern; JSON schema enforced |
-| A04 Insecure Design | ✅ | Minimal attack surface; no server component |
-| A05 Security Misconfiguration | ⚠️ | Firebase rules must be tightened before production |
-| A06 Vulnerable Components | ✅ | Keep `expo`, `firebase`, `@google/generative-ai` updated |
-| A07 Auth Failures | ⚠️ | No auth in MVP; add Firebase Auth before multi-user production |
+| A01 Broken Access Control | ⚠️ Dev | No auth in MVP; add authentication before multi-user production |
+| A02 Cryptographic Failures | ✅ | No sensitive data stored; HTTPS enforced by Vercel |
+| A03 Injection | ✅ | SQL via parameterised template literals; Gemini uses data context pattern |
+| A04 Insecure Design | ✅ | API key isolated server-side; Postgres not publicly reachable |
+| A05 Security Misconfiguration | ✅ | No open DB rules; secrets managed via Vercel Dashboard |
+| A06 Vulnerable Components | ✅ | Keep `expo`, `@vercel/postgres`, `@google/generative-ai` updated |
+| A07 Auth Failures | ⚠️ | No auth in MVP; add auth middleware to Vercel functions for production |
 | A08 Software/Data Integrity | ✅ | Dependencies pinned in package.json |
-| A09 Logging/Monitoring | ✅ | No sensitive data logged; use Firebase Crashlytics in prod |
-| A10 SSRF | N/A | No server-side HTTP requests from the app |
+| A09 Logging/Monitoring | ✅ | No sensitive data logged; use Vercel observability in prod |
+| A10 SSRF | ✅ | Vercel functions do not forward user-supplied URLs as server requests |

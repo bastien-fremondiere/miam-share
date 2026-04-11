@@ -1,17 +1,17 @@
 // components/recipe-card.tsx — Tappable recipe card with macro summary
 
+import { Brand, Colors } from '@/constants/theme';
+import type { Recipe } from '@/types/recipe';
+import { useRouter } from 'expo-router';
 import React from 'react';
 import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  useColorScheme,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
+    useColorScheme,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Brand, Colors } from '@/constants/theme';
 import { MacroBadge } from './macro-badge';
-import type { Recipe } from '@/types/recipe';
 
 interface RecipeCardProps {
   recipe: Recipe;

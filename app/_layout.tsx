@@ -4,9 +4,9 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
+import { RecipesProvider } from '@/context/recipes-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useShareIntent } from '@/hooks/use-share-intent';
-import { RecipesProvider } from '@/context/recipes-context';
 
 export const unstable_settings = {
   anchor: '(tabs)',

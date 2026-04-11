@@ -1,28 +1,28 @@
 // app/(tabs)/planner.tsx — Weekly batch-cooking meal planner
 
-import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useColorScheme,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useRecipes } from '@/context/recipes-context';
 import { MacroBadge } from '@/components/macro-badge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Brand, Colors } from '@/constants/theme';
+import { useRecipes } from '@/context/recipes-context';
 import {
-  generateWeeklyPlan,
-  calculateWeeklyMacroSummary,
-  DAY_NAMES,
+    calculateWeeklyMacroSummary,
+    DAY_NAMES,
+    generateWeeklyPlan,
 } from '@/services/meal-planner';
 import type { WeeklyPlan } from '@/types/recipe';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    useColorScheme,
+    View,
+} from 'react-native';
 
 export default function PlannerScreen() {
   const { recipes } = useRecipes();

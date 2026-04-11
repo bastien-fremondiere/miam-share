@@ -1,36 +1,36 @@
-// context/recipes-context.tsx — Global real-time recipe state via Firestore
-// Provides recipe data and CRUD actions throughout the app.
+// context/recipes-context.tsx — Global recipe state with REST polling
+// Polls the Vercel backend every 10 s and on app foreground for near-real-time sync.
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-  type ReactNode,
-} from 'react';
 import {
-  subscribeToRecipes,
-  addRecipe as fbAddRecipe,
-  deleteRecipe as fbDeleteRecipe,
-  updateRecipe as fbUpdateRecipe,
-} from '@/services/firebase';
+    addRecipe as apiAdd,
+    deleteRecipe as apiDelete,
+    updateRecipe as apiUpdate,
+    getRecipes,
+} from '@/services/api';
 import type { Recipe } from '@/types/recipe';
+import React, {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
+    type ReactNode,
+} from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
+
+const POLL_INTERVAL_MS = 10_000; // 10-second polling for near-real-time family sync
 
 // ── Context types ──────────────────────────────────────────────────────────
 
 interface RecipesContextValue {
-  /** All saved recipes, synced in real-time from Firestore */
   recipes: Recipe[];
-  /** True while the initial Firestore subscription is loading */
   loading: boolean;
-  /** Error message if the Firestore subscription fails */
   error: string | null;
-  /** Add a new recipe and return the Firestore document ID */
+  /** Trigger a manual refresh (e.g. after pull-to-refresh) */
+  refresh: () => Promise<void>;
   addRecipe: (recipe: Omit<Recipe, 'id' | 'created_at' | 'updated_at'>) => Promise<string>;
-  /** Update fields of an existing recipe by ID */
   updateRecipe: (id: string, updates: Partial<Omit<Recipe, 'id' | 'created_at'>>) => Promise<void>;
-  /** Permanently delete a recipe by ID */
   deleteRecipe: (id: string) => Promise<void>;
 }
 
@@ -42,39 +42,70 @@ export function RecipesProvider({ children }: { children: ReactNode }) {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadingRef = useRef(false); // prevent concurrent fetches
 
-  // Subscribe to Firestore real-time updates on mount
-  useEffect(() => {
-    const unsubscribe = subscribeToRecipes(
-      (updated) => {
-        setRecipes(updated);
-        setLoading(false);
-        setError(null);
-      },
-      (err) => {
-        setError(err.message);
-        setLoading(false);
-      },
-    );
-    return () => unsubscribe();
+  const fetchRecipes = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    try {
+      const data = await getRecipes();
+      setRecipes(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de connexion au serveur');
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
   }, []);
 
+  // Initial fetch + interval polling + foreground refresh
+  useEffect(() => {
+    fetchRecipes();
+    const interval = setInterval(fetchRecipes, POLL_INTERVAL_MS);
+    const appStateSub = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state === 'active') fetchRecipes();
+    });
+    return () => {
+      clearInterval(interval);
+      appStateSub.remove();
+    };
+  }, [fetchRecipes]);
+
   const addRecipe = useCallback(
-    (recipe: Omit<Recipe, 'id' | 'created_at' | 'updated_at'>) => fbAddRecipe(recipe),
+    async (recipe: Omit<Recipe, 'id' | 'created_at' | 'updated_at'>): Promise<string> => {
+      const saved = await apiAdd(recipe);
+      // Optimistically insert at top so the UI feels instant
+      setRecipes((prev) => [saved, ...prev]);
+      return saved.id!;
+    },
     [],
   );
 
   const updateRecipe = useCallback(
-    (id: string, updates: Partial<Omit<Recipe, 'id' | 'created_at'>>) =>
-      fbUpdateRecipe(id, updates),
+    async (id: string, updates: Partial<Omit<Recipe, 'id' | 'created_at'>>): Promise<void> => {
+      const updated = await apiUpdate(id, updates);
+      setRecipes((prev) => prev.map((r) => (r.id === id ? updated : r)));
+    },
     [],
   );
 
-  const deleteRecipe = useCallback((id: string) => fbDeleteRecipe(id), []);
+  const deleteRecipe = useCallback(async (id: string): Promise<void> => {
+    await apiDelete(id);
+    setRecipes((prev) => prev.filter((r) => r.id !== id));
+  }, []);
 
   return (
     <RecipesContext.Provider
-      value={{ recipes, loading, error, addRecipe, updateRecipe, deleteRecipe }}>
+      value={{
+        recipes,
+        loading,
+        error,
+        refresh: fetchRecipes,
+        addRecipe,
+        updateRecipe,
+        deleteRecipe,
+      }}>
       {children}
     </RecipesContext.Provider>
   );
@@ -82,14 +113,8 @@ export function RecipesProvider({ children }: { children: ReactNode }) {
 
 // ── Hook ───────────────────────────────────────────────────────────────────
 
-/**
- * Access global recipe state and actions.
- * Must be used inside a <RecipesProvider>.
- */
 export function useRecipes(): RecipesContextValue {
   const ctx = useContext(RecipesContext);
-  if (!ctx) {
-    throw new Error('useRecipes must be used within <RecipesProvider>');
-  }
+  if (!ctx) throw new Error('useRecipes must be used within <RecipesProvider>');
   return ctx;
 }

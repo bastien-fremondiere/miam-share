@@ -1,9 +1,9 @@
 // services/pdf-export.ts — Generate and share a PDF recipe book
 // Uses expo-print (HTML → PDF) + expo-sharing.
 
+import type { Recipe } from '@/types/recipe';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import type { Recipe } from '@/types/recipe';
 
 // ── HTML templates ─────────────────────────────────────────────────────────
 

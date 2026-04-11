@@ -1,27 +1,27 @@
 // app/share-handler.tsx — Modal for processing shared URLs / manually entered text
 // Opened automatically when the app receives an Android share intent.
 
-import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useColorScheme,
-} from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { analyzeRecipe } from '@/services/gemini';
-import { useRecipes } from '@/context/recipes-context';
 import { MacroBadge } from '@/components/macro-badge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Brand, Colors } from '@/constants/theme';
+import { useRecipes } from '@/context/recipes-context';
+import { analyzeRecipe } from '@/services/gemini';
 import type { GeminiRecipeResponse } from '@/types/recipe';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+    useColorScheme,
+} from 'react-native';
 
 type Step = 'input' | 'loading' | 'preview' | 'saving';
 

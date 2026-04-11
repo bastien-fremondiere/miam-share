@@ -1,7 +1,7 @@
 // services/meal-planner.ts — Batch cooking weekly plan generation algorithm
 // See CLAUDE.md "Weekly Planner Algorithm" for design rationale.
 
-import type { Recipe, MacroGoals, WeeklyPlan, WeeklyMacroSummary } from '@/types/recipe';
+import type { MacroGoals, Recipe, WeeklyMacroSummary, WeeklyPlan } from '@/types/recipe';
 
 /**
  * Generate a 7-day batch-cooking meal plan.
