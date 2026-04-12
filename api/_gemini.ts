@@ -77,7 +77,7 @@ async function runGemini(prompt: string, config: GenerationConfig): Promise<Gemi
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
+    model: 'gemini-3.1-flash-lite-preview',
     systemInstruction: SYSTEM_INSTRUCTION,
     generationConfig: config,
   });

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "miam-share",
+    "name": "Miam Share",
     "slug": "miam-share",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -24,15 +24,29 @@
       "predictiveBackGestureEnabled": false,
       "intentFilters": [
         {
-          "action": "android.intent.action.SEND",
+          "action": "SEND",
           "data": [
             {
               "mimeType": "text/plain"
             }
           ],
           "category": [
-            "android.intent.category.DEFAULT",
-            "android.intent.category.BROWSABLE"
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "https"
+            },
+            {
+              "scheme": "http"
+            }
+          ],
+          "category": [
+            "DEFAULT",
+            "BROWSABLE"
           ]
         }
       ]

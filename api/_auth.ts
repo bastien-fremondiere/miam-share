@@ -48,6 +48,16 @@ export async function requireAuth(
       return null;
     }
 
+    // Check email allowlist if configured
+    const allowedEmails = process.env.ALLOWED_EMAILS;
+    if (allowedEmails) {
+      const list = allowedEmails.split(',').map((e) => e.trim().toLowerCase());
+      if (!list.includes(info.email.toLowerCase())) {
+        res.status(403).json({ error: 'Unauthorized user' });
+        return null;
+      }
+    }
+
     return { sub: info.sub, email: info.email };
   } catch {
     res.status(401).json({ error: 'Token verification failed' });

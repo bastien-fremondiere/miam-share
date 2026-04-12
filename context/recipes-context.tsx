@@ -41,7 +41,7 @@ const RecipesContext = createContext<RecipesContextValue | null>(null);
 // ── Provider ───────────────────────────────────────────────────────────────
 
 export function RecipesProvider({ children }: { children: ReactNode }) {
-  const { accessToken } = useAuth();
+  const { getFreshToken } = useAuth();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,26 +77,29 @@ export function RecipesProvider({ children }: { children: ReactNode }) {
 
   const addRecipe = useCallback(
     async (recipe: Omit<Recipe, 'id' | 'created_at' | 'updated_at'>): Promise<string> => {
-      const saved = await apiAdd(recipe, accessToken);
+      const token = await getFreshToken();
+      const saved = await apiAdd(recipe, token);
       // Optimistically insert at top so the UI feels instant
       setRecipes((prev) => [saved, ...prev]);
       return saved.id!;
     },
-    [accessToken],
+    [getFreshToken],
   );
 
   const updateRecipe = useCallback(
     async (id: string, updates: Partial<Omit<Recipe, 'id' | 'created_at'>>): Promise<void> => {
-      const updated = await apiUpdate(id, updates, accessToken);
+      const token = await getFreshToken();
+      const updated = await apiUpdate(id, updates, token);
       setRecipes((prev) => prev.map((r) => (r.id === id ? updated : r)));
     },
-    [accessToken],
+    [getFreshToken],
   );
 
   const deleteRecipe = useCallback(async (id: string): Promise<void> => {
-    await apiDelete(id, accessToken);
+    const token = await getFreshToken();
+    await apiDelete(id, token);
     setRecipes((prev) => prev.filter((r) => r.id !== id));
-  }, [accessToken]);
+  }, [getFreshToken]);
 
   return (
     <RecipesContext.Provider

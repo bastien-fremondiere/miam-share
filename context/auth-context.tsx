@@ -10,18 +10,18 @@
 //   EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID — web client ID (required for idToken)
 
 import {
-    GoogleSignin,
-    isErrorWithCode,
-    isSuccessResponse,
-    statusCodes,
+  GoogleSignin,
+  isErrorWithCode,
+  isSuccessResponse,
+  statusCodes,
 } from '@react-native-google-signin/google-signin';
 import React, {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useState,
-    type ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
 } from 'react';
 
 // ── Configure once ─────────────────────────────────────────────────────────
@@ -43,6 +43,8 @@ export interface GoogleUser {
 interface AuthContextValue {
   user: GoogleUser | null;
   accessToken: string | null;
+  /** Get a fresh idToken (refreshes automatically if expired) */
+  getFreshToken: () => Promise<string | null>;
   loading: boolean;
   signIn: () => Promise<void>;
   signOut: () => void;
@@ -63,8 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const currentUser = GoogleSignin.getCurrentUser();
         if (currentUser) {
-          const { user: u, idToken } = currentUser;
+          const { user: u } = currentUser;
           setUser({ id: u.id, email: u.email, name: u.name ?? '', picture: u.photo ?? undefined });
+          // Get a fresh idToken (cached one may be expired)
+          const { idToken } = await GoogleSignin.getTokens();
           setAccessToken(idToken ?? null);
         }
       } catch {
@@ -94,6 +98,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /** Always returns a fresh idToken by calling getTokens() which auto-refreshes */
+  const getFreshToken = useCallback(async (): Promise<string | null> => {
+    try {
+      const currentUser = GoogleSignin.getCurrentUser();
+      if (!currentUser) return null;
+      const { idToken } = await GoogleSignin.getTokens();
+      setAccessToken(idToken ?? null);
+      return idToken ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     try {
       await GoogleSignin.signOut();
@@ -105,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, accessToken, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, accessToken, getFreshToken, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

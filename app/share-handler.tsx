@@ -4,6 +4,7 @@
 import { MacroBadge } from '@/components/macro-badge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Brand, Colors } from '@/constants/theme';
+import { useAuth } from '@/context/auth-context';
 import { useRecipes } from '@/context/recipes-context';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { analyzeRecipe } from '@/services/gemini';
@@ -30,6 +31,7 @@ export default function ShareHandlerScreen() {
   const { url } = useLocalSearchParams<{ url?: string }>();
   const router = useRouter();
   const { addRecipe } = useRecipes();
+  const { getFreshToken } = useAuth();
   const requireAuth = useRequireAuth();
   const scheme = useColorScheme() ?? 'light';
   const colors = Colors[scheme];
@@ -55,7 +57,8 @@ export default function ShareHandlerScreen() {
 
     setStep('loading');
     try {
-      const result = await analyzeRecipe(text);
+      const token = await getFreshToken();
+      const result = await analyzeRecipe(text, token);
       setRecipe(result);
       setStep('preview');
     } catch (err) {

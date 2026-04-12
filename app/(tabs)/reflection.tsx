@@ -192,7 +192,7 @@ const variantStyles = StyleSheet.create({
 
 export default function ReflectionScreen() {
   const { addRecipe } = useRecipes();
-  const { user, accessToken, signOut } = useAuth();
+  const { user, getFreshToken, signOut } = useAuth();
   const scheme = useColorScheme() ?? 'light';
   const colors = Colors[scheme];
   const listRef = useRef<FlatList>(null);
@@ -227,7 +227,8 @@ export default function ReflectionScreen() {
     setLoading(true);
 
     try {
-      const variants = await generateRecipeIdeas(prompt, 3, accessToken);
+      const token = await getFreshToken();
+      const variants = await generateRecipeIdeas(prompt, 3, token);
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',

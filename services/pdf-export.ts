@@ -4,13 +4,13 @@
 import type { DayMealPlan, Recipe } from '@/types/recipe';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { LOGO_BASE64 } from './_logo-base64';
 import {
     buildShoppingList,
     buildShoppingListFromPlan,
     formatQty,
     type GroupedShoppingList,
 } from './shopping-list';
-import { LOGO_BASE64 } from './_logo-base64';
 
 // ── HTML templates ─────────────────────────────────────────────────────────
 
