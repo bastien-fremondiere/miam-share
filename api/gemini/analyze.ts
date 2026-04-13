@@ -1,11 +1,15 @@
 // api/gemini/analyze.ts — POST /api/gemini/analyze
 // Receives raw text / URL from the mobile app and returns a structured recipe.
+// For Instagram URLs, downloads the post's video/image and sends it to Gemini.
 // The GEMINI_API_KEY never leaves the server.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from '../_auth';
 import { setCors } from '../_cors';
-import { analyzeRecipeServer } from '../_gemini';
+import { analyzeInstagramServer, analyzeRecipeServer, isInstagramUrl } from '../_gemini';
+
+// Allow up to 60 s for Instagram download + Gemini analysis
+export const maxDuration = 60;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(res);
@@ -18,8 +22,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { text } = req.body as { text?: string };
   if (!text?.trim()) return res.status(400).json({ error: '`text` field is required' });
 
+  const input = text.trim();
+
   try {
-    const recipe = await analyzeRecipeServer(text.trim());
+    const recipe = isInstagramUrl(input)
+      ? await analyzeInstagramServer(input)
+      : await analyzeRecipeServer(input);
     return res.status(200).json(recipe);
   } catch (err) {
     console.error('[POST /api/gemini/analyze]', err);

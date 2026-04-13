@@ -133,7 +133,9 @@ export default function ShareHandlerScreen() {
                   Gemini analyse le contenu…
                 </Text>
                 <Text style={[styles.loadingHint, { color: colors.textSecondary }]}>
-                  Extraction des ingrédients et calcul des macros pour 6 portions.
+                  {/instagram\.com\/(p|reel|tv|stories)\//.test(rawText)
+                    ? 'Téléchargement de la vidéo Instagram et extraction de la recette pour 6 portions…'
+                    : 'Extraction des ingrédients et calcul des macros pour 6 portions.'}
                 </Text>
               </View>
             ) : (

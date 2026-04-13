@@ -98,11 +98,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  /** Always returns a fresh idToken by calling getTokens() which auto-refreshes */
+  /**
+   * Always returns a fresh idToken.
+   * Uses signInSilently() to force a real server-side token refresh — idTokens
+   * expire after 1 hour and getTokens() only returns the cached (possibly
+   * expired) value. signInSilently() re-authenticates transparently and
+   * returns a brand-new idToken.
+   */
   const getFreshToken = useCallback(async (): Promise<string | null> => {
     try {
       const currentUser = GoogleSignin.getCurrentUser();
       if (!currentUser) return null;
+
+      // signInSilently() forces a real token refresh from Google's servers
+      const response = await GoogleSignin.signInSilently();
+      if (response.type === 'success') {
+        const token = response.data.idToken ?? null;
+        setAccessToken(token);
+        return token;
+      }
+
+      // Fallback: try cached tokens (works if the idToken hasn't expired yet)
       const { idToken } = await GoogleSignin.getTokens();
       setAccessToken(idToken ?? null);
       return idToken ?? null;

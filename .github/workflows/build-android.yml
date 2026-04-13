@@ -1,0 +1,101 @@
+name: Build Android (EAS)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile
+        type: choice
+        options:
+          - development
+          - preview
+          - production
+        default: preview
+        required: true
+
+jobs:
+  build:
+    name: EAS Android Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # required to create GitHub Releases
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Determine build profile
+        id: profile
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "value=production" >> $GITHUB_OUTPUT
+          else
+            echo "value=${{ github.event.inputs.profile }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Android
+        id: eas_build
+        run: |
+          BUILD_JSON=$(eas build \
+            --platform android \
+            --profile ${{ steps.profile.outputs.value }} \
+            --non-interactive \
+            --json)
+          echo "$BUILD_JSON" | tee build-result.json
+          ARTIFACT_URL=$(echo "$BUILD_JSON" | jq -r '.[0].artifacts.buildUrl // empty')
+          echo "artifact_url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
+        env:
+          EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
+          EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+          EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID }}
+
+      - name: Download artifact from EAS
+        if: steps.eas_build.outputs.artifact_url != ''
+        run: |
+          mkdir -p dist
+          URL="${{ steps.eas_build.outputs.artifact_url }}"
+          # Determine extension from URL (apk or aab)
+          if [[ "$URL" == *.aab* ]]; then EXT=aab; else EXT=apk; fi
+          FILENAME="miam-share-${{ steps.profile.outputs.value }}.$EXT"
+          curl -L "$URL" -o "dist/${FILENAME}"
+          echo "artifact_filename=${FILENAME}" >> $GITHUB_ENV
+          echo "artifact_ext=${EXT}" >> $GITHUB_ENV
+
+      # Always upload to Actions artifacts (available 30 days, all profiles)
+      - name: Upload as workflow artifact
+        if: steps.eas_build.outputs.artifact_url != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: miam-share-${{ steps.profile.outputs.value }}
+          path: dist/
+          retention-days: 30
+
+      # On tag push: also publish a GitHub Release with the file attached
+      - name: Create GitHub Release
+        if: >
+          steps.eas_build.outputs.artifact_url != '' &&
+          github.event_name == 'push' &&
+          startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Miam Share ${{ github.ref_name }}
+          generate_release_notes: true
+          files: dist/${{ env.artifact_filename }}

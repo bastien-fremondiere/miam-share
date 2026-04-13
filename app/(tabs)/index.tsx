@@ -6,15 +6,18 @@ import { Brand, Colors } from '@/constants/theme';
 import { useRecipes } from '@/context/recipes-context';
 import type { RecipeSortKey, SortDirection } from '@/types/recipe';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Animated,
     FlatList,
+    Modal,
     Pressable,
     RefreshControl,
     StyleSheet,
     Text,
     TextInput,
+    TouchableWithoutFeedback,
     View,
     useColorScheme,
 } from 'react-native';
@@ -32,6 +35,20 @@ export default function RecipesScreen() {
   const scheme = useColorScheme() ?? 'light';
   const colors = Colors[scheme];
   const [refreshing, setRefreshing] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
+  const fabAnim = useRef(new Animated.Value(0)).current;
+
+  const toggleFab = () => {
+    const toValue = fabOpen ? 0 : 1;
+    Animated.spring(fabAnim, { toValue, useNativeDriver: true, friction: 6 }).start();
+    setFabOpen(!fabOpen);
+  };
+
+  const closeFab = () => {
+    if (!fabOpen) return;
+    Animated.spring(fabAnim, { toValue: 0, useNativeDriver: true, friction: 6 }).start();
+    setFabOpen(false);
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -242,13 +259,63 @@ export default function RecipesScreen() {
         }
       />
 
-      {/* FAB — navigate to share handler for manual entry */}
-      <Pressable
-        style={styles.fab}
-        onPress={() => router.push('/share-handler')}
-        accessibilityLabel="Ajouter une recette">
-        <IconSymbol name="plus" size={28} color="#fff" />
-      </Pressable>
+      {/* FAB menu overlay — closes when tapping outside */}
+      {fabOpen && (
+        <Modal transparent animationType="none" onRequestClose={closeFab}>
+          <TouchableWithoutFeedback onPress={closeFab}>
+            <View style={styles.fabOverlay}>
+              {/* Action items — appear above the FAB */}
+              <Animated.View
+                style={[
+                  styles.fabMenu,
+                  {
+                    opacity: fabAnim,
+                    transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+                  },
+                ]}>
+                {/* Option 2: generate idea */}
+                <Pressable
+                  style={[styles.fabMenuItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => { closeFab(); router.push('/(tabs)/reflection'); }}>
+                  <IconSymbol name="sparkles" size={20} color={Brand.accent} />
+                  <Text style={[styles.fabMenuLabel, { color: colors.text }]}>Générer une idée IA</Text>
+                </Pressable>
+
+                {/* Option 1: share URL / text */}
+                <Pressable
+                  style={[styles.fabMenuItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => { closeFab(); router.push('/share-handler'); }}>
+                  <IconSymbol name="link" size={20} color={Brand.primary} />
+                  <Text style={[styles.fabMenuLabel, { color: colors.text }]}>
+                    Analyser une URL ou texte
+                  </Text>
+                </Pressable>
+              </Animated.View>
+
+              {/* FAB button (mirrored position — inside modal so overlay works) */}
+              <Pressable
+                style={[styles.fab, fabOpen && styles.fabActive]}
+                onPress={closeFab}
+                accessibilityLabel="Fermer le menu">
+                <Animated.View
+                  style={{ transform: [{ rotate: fabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] }) }] }}>
+                  <IconSymbol name="plus" size={28} color="#fff" />
+                </Animated.View>
+              </Pressable>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
+
+      {/* FAB button (normal position when menu is closed) */}
+      {!fabOpen && (
+        <Pressable
+          style={styles.fab}
+          onPress={toggleFab}
+          accessibilityLabel="Ajouter une recette">
+          <IconSymbol name="plus" size={28} color="#fff" />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -312,6 +379,36 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
+  },
+  fabActive: {
+    backgroundColor: Brand.danger,
+  },
+  fabOverlay: {
+    flex: 1,
+  },
+  fabMenu: {
+    position: 'absolute',
+    bottom: 92,
+    right: 24,
+    gap: 10,
+  },
+  fabMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  fabMenuLabel: {
+    fontSize: 15,
+    fontWeight: '500',
   },
 });
 
