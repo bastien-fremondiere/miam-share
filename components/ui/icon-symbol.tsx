@@ -53,6 +53,14 @@ const MAPPING = {
   'calendar.badge.checkmark': 'event-available',
   'square.and.arrow.up.fill': 'share',
   'doc.text': 'description',
+  'gearshape': 'settings',
+  'gearshape.fill': 'settings',
+  'slider.horizontal.3': 'tune',
+  'arrow.counterclockwise': 'history',
+  'info.circle.fill': 'info',
+  'hand.thumbsup.fill': 'thumb-up',
+  'flame.fill': 'local-fire-department',
+  'bolt.fill': 'bolt',
 } as IconMapping;
 
 /**

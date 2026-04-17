@@ -1,17 +1,19 @@
-// app/(tabs)/planner.tsx — Weekly batch-cooking meal planner
-// Features: cheat day toggle, per-slot recipe swap, PDF/text export
+// app/(tabs)/planner.tsx — Batch-cooking weekly planner (batch editing mode)
+// Edit 4 recipe slots (2 batches × lunch+dinner). Day 7 is always a free day.
 
 import { MacroBadge } from '@/components/macro-badge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Brand, Colors } from '@/constants/theme';
 import { useRecipes } from '@/context/recipes-context';
+import { useSettings } from '@/context/settings-context';
 import {
+  batchPlanToWeeklyPlan,
   calculateWeeklyMacroSummary,
   DAY_NAMES,
   generateWeeklyPlan,
 } from '@/services/meal-planner';
 import { buildWeeklyPlanText, exportWeeklyPlanPDF } from '@/services/pdf-export';
-import type { Recipe, WeeklyPlan } from '@/types/recipe';
+import type { BatchPlan, Recipe, WeeklyPlan } from '@/types/recipe';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -24,7 +26,6 @@ import {
   Share,
   StyleSheet,
   Text,
-  TextInput,
   useColorScheme,
   View,
 } from 'react-native';
@@ -36,7 +37,7 @@ interface PickerModalProps {
   recipes: Recipe[];
   onPick: (recipe: Recipe) => void;
   onClose: () => void;
-  colors: ReturnType<typeof Colors['light' | 'dark' extends string ? 'light' : 'dark']>;
+  colors: (typeof Colors)[keyof typeof Colors];
 }
 
 function RecipePickerModal({ visible, recipes, onPick, onClose, colors }: PickerModalProps) {
@@ -86,313 +87,11 @@ const pickerStyles = StyleSheet.create({
   itemMacros: { fontSize: 12 },
 });
 
-// ── Main screen ────────────────────────────────────────────────────────────
+// ── Batch slot sub-component ───────────────────────────────────────────────
 
-export default function PlannerScreen() {
-  const { recipes, refresh } = useRecipes();
-  const router = useRouter();
-  const scheme = useColorScheme() ?? 'light';
-  const colors = Colors[scheme];
+type BatchSlotKey = keyof BatchPlan;
 
-  const [maxKcal, setMaxKcal] = useState('1300');
-  const [minProtein, setMinProtein] = useState('80');
-  const [plan, setPlan] = useState<WeeklyPlan | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [exporting, setExporting] = useState(false);
-
-  // Recipe picker state: which slot is being edited
-  const [pickerTarget, setPickerTarget] = useState<{
-    dayIndex: number;
-    slot: 'lunch' | 'dinner';
-  } | null>(null);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await refresh();
-    setRefreshing(false);
-  };
-
-  const handleGenerate = () => {
-    const kcal = parseFloat(maxKcal);
-    const protein = parseFloat(minProtein);
-
-    if (isNaN(kcal) || kcal <= 0 || isNaN(protein) || protein <= 0) {
-      Alert.alert('Objectifs invalides', 'Saisissez des valeurs numériques positives.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const result = generateWeeklyPlan(recipes, {
-        max_kcal_per_day: kcal,
-        min_protein_per_day: protein,
-      });
-      setPlan(result);
-    } catch (err) {
-      Alert.alert(
-        'Impossible de générer',
-        err instanceof Error ? err.message : 'Erreur inconnue',
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleCheatDay = (dayIndex: number) => {
-    if (!plan) return;
-    setPlan((prev) =>
-      prev!.map((d, i) =>
-        i === dayIndex ? { ...d, cheat_day: !d.cheat_day } : d,
-      ),
-    );
-  };
-
-  const replaceRecipe = (dayIndex: number, slot: 'lunch' | 'dinner', recipe: Recipe) => {
-    if (!plan) return;
-    setPlan((prev) =>
-      prev!.map((d, i) =>
-        i === dayIndex ? { ...d, [slot]: recipe } : d,
-      ),
-    );
-  };
-
-  const handleExportPDF = async () => {
-    if (!plan) return;
-    setExporting(true);
-    try {
-      await exportWeeklyPlanPDF(plan);
-    } catch (err) {
-      Alert.alert('Erreur', err instanceof Error ? err.message : 'Impossible d\'exporter.');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const handleShareText = async () => {
-    if (!plan) return;
-    const text = buildWeeklyPlanText(plan);
-    try {
-      await Share.share({ message: text, title: 'Planning Batch Cooking' });
-    } catch {
-      // user dismissed
-    }
-  };
-
-  const summary = plan ? calculateWeeklyMacroSummary(plan) : null;
-
-  return (
-    <>
-      <ScrollView
-        style={[styles.scroll, { backgroundColor: colors.background }]}
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={Brand.primary}
-            colors={[Brand.primary]}
-          />
-        }>
-        {/* Goals form */}
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>🎯 Objectifs de la semaine</Text>
-
-          <View style={styles.row}>
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>Max kcal / jour</Text>
-              <TextInput
-                value={maxKcal}
-                onChangeText={setMaxKcal}
-                keyboardType="numeric"
-                style={[
-                  styles.input,
-                  { color: colors.text, borderColor: colors.border, backgroundColor: colors.background },
-                ]}
-              />
-            </View>
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>Min protéines / jour (g)</Text>
-              <TextInput
-                value={minProtein}
-                onChangeText={setMinProtein}
-                keyboardType="numeric"
-                style={[
-                  styles.input,
-                  { color: colors.text, borderColor: colors.border, backgroundColor: colors.background },
-                ]}
-              />
-            </View>
-          </View>
-
-          <Pressable
-            onPress={handleGenerate}
-            disabled={loading}
-            style={[styles.generateBtn, loading && styles.generateBtnDisabled]}>
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <IconSymbol name="wand.and.stars" size={18} color="#fff" />
-                <Text style={styles.generateBtnText}>Générer le planning</Text>
-              </>
-            )}
-          </Pressable>
-        </View>
-
-        {/* Weekly macro summary */}
-        {summary && (
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>📊 Moyenne journalière</Text>
-            <View style={styles.macroRow}>
-              <MacroBadge label="kcal" value={summary.avg_kcal} unit="" color={Brand.primary} />
-              <MacroBadge label="protéines" value={summary.avg_protein} unit="g" color={Brand.secondary} />
-              <MacroBadge label="glucides" value={summary.avg_carbs} unit="g" color={Brand.accent} />
-              <MacroBadge label="lipides" value={summary.avg_fat} unit="g" color="#8E6BBF" />
-            </View>
-          </View>
-        )}
-
-        {/* Day-by-day plan */}
-        {plan &&
-          plan.map((day, dayIndex) => (
-            <View
-              key={day.day}
-              style={[
-                styles.dayCard,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-                day.cheat_day && { borderColor: '#8E6BBF44' },
-              ]}>
-              {/* Day header */}
-              <View
-                style={[
-                  styles.dayHeader,
-                  { backgroundColor: day.cheat_day ? '#8E6BBF18' : Brand.primary + '18' },
-                ]}>
-                <Text
-                  style={[
-                    styles.dayName,
-                    { color: day.cheat_day ? '#8E6BBF' : Brand.primary },
-                  ]}>
-                  {DAY_NAMES[day.day]}
-                </Text>
-                {/* Cheat day toggle */}
-                <Pressable
-                  onPress={() => toggleCheatDay(dayIndex)}
-                  style={[
-                    styles.cheatBtn,
-                    day.cheat_day && { backgroundColor: '#8E6BBF22' },
-                  ]}>
-                  <IconSymbol
-                    name="moon.stars.fill"
-                    size={14}
-                    color={day.cheat_day ? '#8E6BBF' : colors.textSecondary}
-                  />
-                  <Text
-                    style={[
-                      styles.cheatBtnText,
-                      { color: day.cheat_day ? '#8E6BBF' : colors.textSecondary },
-                    ]}>
-                    {day.cheat_day ? 'Jour libre ✓' : 'Jour libre'}
-                  </Text>
-                </Pressable>
-              </View>
-
-              {day.cheat_day ? (
-                <View style={styles.cheatDayContent}>
-                  <Text style={styles.cheatEmoji}>🎉</Text>
-                  <Text style={[styles.cheatTitle, { color: '#8E6BBF' }]}>Jour libre</Text>
-                  <Text style={[styles.cheatSubtitle, { color: colors.textSecondary }]}>
-                    Pas de batch cooking aujourd'hui
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  {/* Lunch */}
-                  <MealSlot
-                    emoji="☀️"
-                    label="Déjeuner"
-                    recipe={day.lunch}
-                    colors={colors}
-                    onPress={() => day.lunch.id && router.push(`/recipe/${day.lunch.id}`)}
-                    onReplace={() => setPickerTarget({ dayIndex, slot: 'lunch' })}
-                  />
-
-                  <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-                  {/* Dinner */}
-                  <MealSlot
-                    emoji="🌙"
-                    label="Dîner"
-                    recipe={day.dinner}
-                    colors={colors}
-                    onPress={() => day.dinner.id && router.push(`/recipe/${day.dinner.id}`)}
-                    onReplace={() => setPickerTarget({ dayIndex, slot: 'dinner' })}
-                  />
-                </>
-              )}
-            </View>
-          ))}
-
-        {/* Export actions */}
-        {plan && (
-          <View style={[styles.exportRow]}>
-            <Pressable
-              style={[styles.exportBtn, { backgroundColor: Brand.primary }]}
-              disabled={exporting}
-              onPress={handleExportPDF}>
-              {exporting ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
-                  <IconSymbol name="square.and.arrow.up.fill" size={16} color="#fff" />
-                  <Text style={styles.exportBtnText}>Exporter PDF</Text>
-                </>
-              )}
-            </Pressable>
-            <Pressable
-              style={[styles.exportBtn, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
-              onPress={handleShareText}>
-              <IconSymbol name="square.and.arrow.up" size={16} color={colors.text} />
-              <Text style={[styles.exportBtnText, { color: colors.text }]}>Partager</Text>
-            </Pressable>
-          </View>
-        )}
-
-        {!plan && !loading && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>📅</Text>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>Pas encore de planning</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-              Définissez vos objectifs et appuyez sur "Générer" pour créer votre semaine batch
-              cooking.
-            </Text>
-            {recipes.length < 2 && (
-              <Text style={[styles.emptyHint, { color: Brand.primary }]}>
-                ⚠️ Il vous faut au moins 2 recettes sauvegardées.
-              </Text>
-            )}
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Recipe picker modal */}
-      <RecipePickerModal
-        visible={pickerTarget !== null}
-        recipes={recipes}
-        colors={colors}
-        onPick={(recipe) => {
-          if (pickerTarget) replaceRecipe(pickerTarget.dayIndex, pickerTarget.slot, recipe);
-        }}
-        onClose={() => setPickerTarget(null)}
-      />
-    </>
-  );
-}
-
-// ── Meal slot sub-component ────────────────────────────────────────────────
-
-function MealSlot({
+function BatchSlot({
   emoji,
   label,
   recipe,
@@ -428,53 +127,349 @@ function MealSlot({
   );
 }
 
+// ── Main screen ────────────────────────────────────────────────────────────
+
+export default function PlannerScreen() {
+  const { recipes, refresh } = useRecipes();
+  const { settings } = useSettings();
+  const router = useRouter();
+  const scheme = useColorScheme() ?? 'light';
+  const colors = Colors[scheme];
+
+  const [batch, setBatch] = useState<BatchPlan | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Which batch slot is being edited in the picker
+  const [pickerTarget, setPickerTarget] = useState<BatchSlotKey | null>(null);
+
+  // Derive the full WeeklyPlan from the current batch
+  const plan: WeeklyPlan | null = batch ? batchPlanToWeeklyPlan(batch) : null;
+  const summary = plan ? calculateWeeklyMacroSummary(plan) : null;
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refresh();
+    setRefreshing(false);
+  };
+
+  const handleGenerate = () => {
+    setLoading(true);
+    try {
+      const result = generateWeeklyPlan(recipes, {
+        max_kcal_per_day: settings.max_kcal_per_day,
+        min_protein_per_day: settings.min_protein_per_day,
+      });
+      // Convert the generated plan back to batch form for editing
+      setBatch({
+        batch1Lunch: result[0]!.lunch,
+        batch1Dinner: result[0]!.dinner,
+        batch2Lunch: result[3]!.lunch,
+        batch2Dinner: result[3]!.dinner,
+      });
+    } catch (err) {
+      Alert.alert(
+        'Impossible de générer',
+        err instanceof Error ? err.message : 'Erreur inconnue',
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const replaceSlot = (slot: BatchSlotKey, recipe: Recipe) => {
+    setBatch((prev) => prev ? { ...prev, [slot]: recipe } : prev);
+  };
+
+  const handleExportPDF = async () => {
+    if (!plan) return;
+    setExporting(true);
+    try {
+      await exportWeeklyPlanPDF(plan);
+    } catch (err) {
+      Alert.alert('Erreur', err instanceof Error ? err.message : "Impossible d'exporter.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleShareText = async () => {
+    if (!plan) return;
+    const text = buildWeeklyPlanText(plan);
+    try {
+      await Share.share({ message: text, title: 'Planning Batch Cooking' });
+    } catch {
+      // user dismissed
+    }
+  };
+
+  return (
+    <>
+      <ScrollView
+        style={[styles.scroll, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={Brand.primary}
+            colors={[Brand.primary]}
+          />
+        }>
+
+        {/* Goals banner (links to settings) */}
+        <View style={[styles.goalsBanner, { backgroundColor: Brand.primary + '12', borderColor: Brand.primary + '30' }]}>
+          <IconSymbol name="flame.fill" size={14} color={Brand.primary} />
+          <Text style={[styles.goalsBannerText, { color: Brand.primary }]}>
+            Objectifs : max {settings.max_kcal_per_day} kcal/j · min {settings.min_protein_per_day}g prot/j
+          </Text>
+          <Pressable onPress={() => router.push('/(tabs)/settings')} style={styles.goalsBannerEdit}>
+            <IconSymbol name="gearshape" size={14} color={Brand.primary} />
+          </Pressable>
+        </View>
+
+        {/* Generate button */}
+        <Pressable
+          onPress={handleGenerate}
+          disabled={loading}
+          style={[styles.generateBtn, loading && styles.generateBtnDisabled]}>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <IconSymbol name="wand.and.stars" size={18} color="#fff" />
+              <Text style={styles.generateBtnText}>
+                {batch ? 'Régénérer le planning' : 'Générer le planning'}
+              </Text>
+            </>
+          )}
+        </Pressable>
+
+        {/* ── Batch editing cards ──────────────────────────────── */}
+        {batch && (
+          <>
+            {/* Batch 1: Lundi – Mercredi */}
+            <View style={[styles.batchCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={[styles.batchHeader, { backgroundColor: Brand.primary + '18' }]}>
+                <Text style={[styles.batchLabel, { color: Brand.primary }]}>🥘 Batch 1</Text>
+                <Text style={[styles.batchDays, { color: colors.textSecondary }]}>
+                  Lundi · Mardi · Mercredi
+                </Text>
+              </View>
+              <BatchSlot
+                emoji="☀️"
+                label="Repas 1 — Déjeuner"
+                recipe={batch.batch1Lunch}
+                colors={colors}
+                onPress={() => batch.batch1Lunch.id && router.push(`/recipe/${batch.batch1Lunch.id}`)}
+                onReplace={() => setPickerTarget('batch1Lunch')}
+              />
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              <BatchSlot
+                emoji="🌙"
+                label="Repas 2 — Dîner"
+                recipe={batch.batch1Dinner}
+                colors={colors}
+                onPress={() => batch.batch1Dinner.id && router.push(`/recipe/${batch.batch1Dinner.id}`)}
+                onReplace={() => setPickerTarget('batch1Dinner')}
+              />
+            </View>
+
+            {/* Batch 2: Jeudi – Samedi */}
+            <View style={[styles.batchCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={[styles.batchHeader, { backgroundColor: Brand.secondary + '18' }]}>
+                <Text style={[styles.batchLabel, { color: Brand.secondary }]}>🥗 Batch 2</Text>
+                <Text style={[styles.batchDays, { color: colors.textSecondary }]}>
+                  Jeudi · Vendredi · Samedi
+                </Text>
+              </View>
+              <BatchSlot
+                emoji="☀️"
+                label="Repas 1 — Déjeuner"
+                recipe={batch.batch2Lunch}
+                colors={colors}
+                onPress={() => batch.batch2Lunch.id && router.push(`/recipe/${batch.batch2Lunch.id}`)}
+                onReplace={() => setPickerTarget('batch2Lunch')}
+              />
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              <BatchSlot
+                emoji="🌙"
+                label="Repas 2 — Dîner"
+                recipe={batch.batch2Dinner}
+                colors={colors}
+                onPress={() => batch.batch2Dinner.id && router.push(`/recipe/${batch.batch2Dinner.id}`)}
+                onReplace={() => setPickerTarget('batch2Dinner')}
+              />
+            </View>
+
+            {/* Sunday: always free day */}
+            <View style={[styles.batchCard, { backgroundColor: colors.surface, borderColor: '#8E6BBF44' }]}>
+              <View style={[styles.batchHeader, { backgroundColor: '#8E6BBF18' }]}>
+                <Text style={[styles.batchLabel, { color: '#8E6BBF' }]}>🎉 Dimanche</Text>
+                <Text style={[styles.batchDays, { color: '#8E6BBF' }]}>Jour libre</Text>
+              </View>
+              <View style={styles.cheatDayContent}>
+                <Text style={styles.cheatEmoji}>🌟</Text>
+                <Text style={[styles.cheatTitle, { color: '#8E6BBF' }]}>Jour libre automatique</Text>
+                <Text style={[styles.cheatSubtitle, { color: colors.textSecondary }]}>
+                  Pas de batch cooking — profitez de votre journée !
+                </Text>
+              </View>
+            </View>
+
+            {/* Weekly macro summary */}
+            {summary && (
+              <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>📊 Moyenne journalière (hors dimanche)</Text>
+                <View style={styles.macroRow}>
+                  <MacroBadge label="kcal" value={summary.avg_kcal} unit="" color={Brand.primary} />
+                  <MacroBadge label="protéines" value={summary.avg_protein} unit="g" color={Brand.secondary} />
+                  <MacroBadge label="glucides" value={summary.avg_carbs} unit="g" color={Brand.accent} />
+                  <MacroBadge label="lipides" value={summary.avg_fat} unit="g" color="#8E6BBF" />
+                </View>
+              </View>
+            )}
+
+            {/* Weekly preview toggle */}
+            <Pressable
+              style={[styles.previewToggle, { borderColor: colors.border }]}
+              onPress={() => setShowPreview((v) => !v)}>
+              <IconSymbol
+                name={showPreview ? 'chevron.left' : 'chevron.right'}
+                size={16}
+                color={colors.textSecondary}
+              />
+              <Text style={[styles.previewToggleText, { color: colors.textSecondary }]}>
+                {showPreview ? 'Masquer le planning détaillé' : 'Voir le planning jour par jour'}
+              </Text>
+            </Pressable>
+
+            {/* Day-by-day preview (read-only) */}
+            {showPreview && plan && plan.map((day) => (
+              <View
+                key={day.day}
+                style={[
+                  styles.dayCard,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  day.cheat_day && { borderColor: '#8E6BBF44' },
+                ]}>
+                <View
+                  style={[
+                    styles.dayHeader,
+                    { backgroundColor: day.cheat_day ? '#8E6BBF18' : Brand.primary + '12' },
+                  ]}>
+                  <Text style={[styles.dayName, { color: day.cheat_day ? '#8E6BBF' : Brand.primary }]}>
+                    {DAY_NAMES[day.day]}
+                  </Text>
+                </View>
+                {day.cheat_day ? (
+                  <Text style={[styles.dayCheatText, { color: '#8E6BBF' }]}>🎉 Jour libre</Text>
+                ) : (
+                  <View style={styles.daySlots}>
+                    <Text style={[styles.daySlotText, { color: colors.text }]} numberOfLines={1}>
+                      ☀️ {day.lunch.title}
+                    </Text>
+                    <Text style={[styles.daySlotText, { color: colors.text }]} numberOfLines={1}>
+                      🌙 {day.dinner.title}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ))}
+
+            {/* Export actions */}
+            <View style={styles.exportRow}>
+              <Pressable
+                style={[styles.exportBtn, { backgroundColor: Brand.primary }]}
+                disabled={exporting}
+                onPress={handleExportPDF}>
+                {exporting ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <IconSymbol name="square.and.arrow.up.fill" size={16} color="#fff" />
+                    <Text style={styles.exportBtnText}>Exporter PDF</Text>
+                  </>
+                )}
+              </Pressable>
+              <Pressable
+                style={[styles.exportBtn, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
+                onPress={handleShareText}>
+                <IconSymbol name="square.and.arrow.up" size={16} color={colors.text} />
+                <Text style={[styles.exportBtnText, { color: colors.text }]}>Partager</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
+
+        {/* Empty state */}
+        {!batch && !loading && (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyEmoji}>📅</Text>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>Pas encore de planning</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+              {'Appuyez sur "Générer" pour créer votre semaine batch cooking avec 4 recettes sur 6 jours. Le dimanche est toujours un jour libre 🎉'}
+            </Text>
+            {recipes.length < 2 && (
+              <Text style={[styles.emptyHint, { color: Brand.primary }]}>
+                ⚠️ Il vous faut au moins 2 recettes sauvegardées.
+              </Text>
+            )}
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Recipe picker modal */}
+      <RecipePickerModal
+        visible={pickerTarget !== null}
+        recipes={recipes}
+        colors={colors}
+        onPick={(recipe) => {
+          if (pickerTarget) replaceSlot(pickerTarget, recipe);
+        }}
+        onClose={() => setPickerTarget(null)}
+      />
+    </>
+  );
+}
+
 // ── Styles ─────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: 16, gap: 12, paddingBottom: 40 },
 
-  card: {
-    borderRadius: 16, borderWidth: 1, padding: 16,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 }, elevation: 2,
+  goalsBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 14 },
-
-  row: { flexDirection: 'row', gap: 12, marginBottom: 14 },
-  field: { flex: 1 },
-  label: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
-  input: {
-    borderWidth: 1, borderRadius: 10, paddingHorizontal: 12,
-    paddingVertical: 8, fontSize: 15, fontWeight: '500',
-  },
+  goalsBannerText: { flex: 1, fontSize: 12, fontWeight: '500' },
+  goalsBannerEdit: { padding: 2 },
 
   generateBtn: {
-    backgroundColor: Brand.primary, borderRadius: 12, paddingVertical: 13,
+    backgroundColor: Brand.primary, borderRadius: 12, paddingVertical: 14,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
   generateBtnDisabled: { opacity: 0.6 },
   generateBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 
+  card: {
+    borderRadius: 16, borderWidth: 1, padding: 16,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 }, elevation: 2,
+  },
+  sectionTitle: { fontSize: 15, fontWeight: '600', marginBottom: 12 },
   macroRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 
-  dayCard: { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  dayHeader: {
+  batchCard: { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
+  batchHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 8, paddingHorizontal: 14,
+    paddingVertical: 10, paddingHorizontal: 14,
   },
-  dayName: { fontSize: 14, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
-
-  cheatBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20,
-  },
-  cheatBtnText: { fontSize: 11, fontWeight: '500' },
-
-  cheatDayContent: { alignItems: 'center', paddingVertical: 24 },
-  cheatEmoji: { fontSize: 36 },
-  cheatTitle: { fontSize: 16, fontWeight: '700', marginTop: 6 },
-  cheatSubtitle: { fontSize: 13, marginTop: 2 },
+  batchLabel: { fontSize: 15, fontWeight: '700' },
+  batchDays: { fontSize: 12 },
 
   mealRow: { flexDirection: 'row', alignItems: 'center', paddingRight: 8 },
   mealPressable: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },
@@ -485,6 +480,24 @@ const styles = StyleSheet.create({
   mealMacros: { fontSize: 12 },
   swapBtn: { padding: 10 },
   divider: { height: 1, marginHorizontal: 14 },
+
+  cheatDayContent: { alignItems: 'center', paddingVertical: 20 },
+  cheatEmoji: { fontSize: 32 },
+  cheatTitle: { fontSize: 15, fontWeight: '700', marginTop: 4 },
+  cheatSubtitle: { fontSize: 12, marginTop: 2, textAlign: 'center', paddingHorizontal: 16 },
+
+  previewToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
+  },
+  previewToggleText: { fontSize: 13, fontWeight: '500' },
+
+  dayCard: { borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
+  dayHeader: { paddingVertical: 6, paddingHorizontal: 12 },
+  dayName: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  dayCheatText: { fontSize: 13, fontStyle: 'italic', paddingHorizontal: 12, paddingVertical: 8 },
+  daySlots: { paddingHorizontal: 12, paddingVertical: 8, gap: 2 },
+  daySlotText: { fontSize: 13 },
 
   exportRow: { flexDirection: 'row', gap: 10 },
   exportBtn: {
