@@ -3,6 +3,7 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Brand, Colors } from '@/constants/theme';
 import { useSettings } from '@/context/settings-context';
+import Constants from 'expo-constants';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -169,8 +170,8 @@ export default function SettingsScreen() {
         <View style={[styles.infoBox, { backgroundColor: Brand.primary + '12', borderColor: Brand.primary + '30' }]}>
           <IconSymbol name="info.circle" size={14} color={Brand.primary} />
           <Text style={[styles.infoText, { color: Brand.primary }]}>
-            Par repas : max {Math.round(parseFloat(kcal) / 2) || 500} kcal ·
-            min {Math.round(parseFloat(protein) / 2) || 50}g prot
+            Par repas : max {Math.round(parseFloat(kcal) / 2) || Math.round(settings.max_kcal_per_day / 2)} kcal ·
+            min {Math.round(parseFloat(protein) / 2) || Math.round(settings.min_protein_per_day / 2)}g prot
           </Text>
         </View>
 
@@ -221,7 +222,9 @@ export default function SettingsScreen() {
           <IconSymbol name="info.circle" size={20} color={colors.textSecondary} />
           <View style={styles.infoRowText}>
             <Text style={[styles.infoRowLabel, { color: colors.text }]}>Miam Share</Text>
-            <Text style={[styles.infoRowValue, { color: colors.textSecondary }]}>Version 1.0.0 — Batch Cooking Planner</Text>
+            <Text style={[styles.infoRowValue, { color: colors.textSecondary }]}>
+              Version {Constants.expoConfig?.version ?? '1.0.0'} — Batch Cooking Planner
+            </Text>
           </View>
         </View>
         <View style={[styles.separator, { backgroundColor: colors.border }]} />

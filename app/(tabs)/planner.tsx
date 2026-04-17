@@ -163,6 +163,9 @@ export default function PlannerScreen() {
         min_protein_per_day: settings.min_protein_per_day,
       });
       // Convert the generated plan back to batch form for editing
+      if (result.length < 7) {
+        throw new Error('Le planning généré est incomplet. Veuillez réessayer.');
+      }
       setBatch({
         batch1Lunch: result[0]!.lunch,
         batch1Dinner: result[0]!.dinner,
@@ -337,7 +340,7 @@ export default function PlannerScreen() {
               style={[styles.previewToggle, { borderColor: colors.border }]}
               onPress={() => setShowPreview((v) => !v)}>
               <IconSymbol
-                name={showPreview ? 'chevron.left' : 'chevron.right'}
+                name={showPreview ? 'chevron.up' : 'chevron.down'}
                 size={16}
                 color={colors.textSecondary}
               />

@@ -20,6 +20,8 @@ const MAPPING = {
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
   'chevron.left': 'chevron-left',
+  'chevron.up': 'expand-less',
+  'chevron.down': 'expand-more',
   // App-specific
   'fork.knife': 'restaurant',
   'calendar': 'calendar-today',
