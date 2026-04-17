@@ -1,7 +1,7 @@
 // services/meal-planner.ts — Batch cooking weekly plan generation algorithm
 // See CLAUDE.md "Weekly Planner Algorithm" for design rationale.
 
-import type { MacroGoals, Recipe, WeeklyMacroSummary, WeeklyPlan } from '@/types/recipe';
+import type { BatchPlan, MacroGoals, Recipe, WeeklyMacroSummary, WeeklyPlan } from '@/types/recipe';
 
 /**
  * Generate a 7-day batch-cooking meal plan.
@@ -10,7 +10,7 @@ import type { MacroGoals, Recipe, WeeklyMacroSummary, WeeklyPlan } from '@/types
  *   - Each recipe yields 6 portions
  *   - 2 meals/day × 3 days = 6 portions consumed per batch
  *   - Week needs: 2 lunch batches (days 1-3, days 4-6) + 2 dinner batches
- *   - Day 7 reuses the first batches (last portions)
+ *   - Day 7 (Sunday) is always a free/cheat day
  *
  * @param recipes  - All available recipes from Firestore
  * @param goals    - User macro goals (kcal + protein constraints)
@@ -46,21 +46,40 @@ export function generateWeeklyPlan(recipes: Recipe[], goals: MacroGoals): Weekly
   // Pick up to 4 distinct recipes for the 4 batch slots
   // lunchA (days 1-3), lunchB (days 4-6), dinnerA (days 1-3), dinnerB (days 4-6)
   const pool = shuffled.slice(0, Math.min(4, shuffled.length));
-  const getLunch = (batchIndex: 0 | 1): Recipe => pool[batchIndex] ?? pool[0]!;
-  const getDinner = (batchIndex: 0 | 1): Recipe =>
-    pool[batchIndex + 2] ?? pool[batchIndex] ?? pool[0]!;
+  const batch: BatchPlan = {
+    batch1Lunch: pool[0]!,
+    batch1Dinner: pool[2] ?? pool[0]!,
+    batch2Lunch: pool[1] ?? pool[0]!,
+    batch2Dinner: pool[3] ?? pool[1] ?? pool[0]!,
+  };
 
+  return batchPlanToWeeklyPlan(batch);
+}
+
+/**
+ * Convert 4 batch slots into a full 7-day WeeklyPlan.
+ * Days 1-3 use batch 1, days 4-6 use batch 2, day 7 is always a free/cheat day.
+ */
+export function batchPlanToWeeklyPlan(batch: BatchPlan): WeeklyPlan {
   const plan: WeeklyPlan = [];
   for (let day = 1; day <= 7; day++) {
-    // Days 1-3: batch 0 | Days 4-6: batch 1 | Day 7: reuse batch 0 last portions
-    const batchIndex: 0 | 1 = day <= 3 || day === 7 ? 0 : 1;
-    plan.push({
-      day,
-      lunch: getLunch(batchIndex),
-      dinner: getDinner(batchIndex),
-    });
+    if (day === 7) {
+      // Sunday is always a free day — use batch2 recipes as placeholders
+      plan.push({
+        day,
+        lunch: batch.batch2Lunch,
+        dinner: batch.batch2Dinner,
+        cheat_day: true,
+      });
+    } else {
+      const useBatch1 = day <= 3;
+      plan.push({
+        day,
+        lunch: useBatch1 ? batch.batch1Lunch : batch.batch2Lunch,
+        dinner: useBatch1 ? batch.batch1Dinner : batch.batch2Dinner,
+      });
+    }
   }
-
   return plan;
 }
 

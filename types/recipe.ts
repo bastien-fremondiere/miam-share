@@ -69,6 +69,18 @@ export interface DayMealPlan {
 /** Full 7-day meal plan */
 export type WeeklyPlan = DayMealPlan[];
 
+/**
+ * The 4 batch slots that define a full week.
+ * Batch 1 covers Lun–Mer, Batch 2 covers Jeu–Sam.
+ * Dimanche is always a free/cheat day.
+ */
+export interface BatchPlan {
+  batch1Lunch: Recipe;
+  batch1Dinner: Recipe;
+  batch2Lunch: Recipe;
+  batch2Dinner: Recipe;
+}
+
 /** Average macros computed across a WeeklyPlan */
 export interface WeeklyMacroSummary {
   avg_kcal: number;
