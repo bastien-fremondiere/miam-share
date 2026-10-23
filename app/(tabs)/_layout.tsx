@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Image } from 'react-native';
+import { Image, Platform } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -49,6 +49,7 @@ export default function TabLayout() {
         name="reflection"
         options={{
           title: 'Réflexion',
+          href: Platform.OS === 'ios' ? null : '/reflection',
           tabBarIcon: ({ color }) => <IconSymbol size={26} name="lightbulb" color={color} />,
         }}
       />
