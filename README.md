@@ -286,6 +286,9 @@ interface Recipe {
 | `npm run build:android:dev` | EAS Build | Debug APK for local testing |
 | `npm run build:android:preview` | EAS Build | Release APK for internal testing |
 | `npm run build:android` | EAS Build | Production AAB for Google Play |
+| `npm run build:ios:dev` | EAS Build | Simulator / Dev build for iOS |
+| `npm run build:ios:preview` | EAS Build | Internal preview build for iOS |
+| `npm run build:ios` | EAS Build | Production build for iOS |
 
 ---
 

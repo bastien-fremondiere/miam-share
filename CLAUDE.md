@@ -234,15 +234,18 @@ npx tsc --noEmit
 # Deploy backend to Vercel
 vercel deploy
 
-# ── EAS Build (Android) ──────────────────────────────────────────────────
-# Dev build (debug APK for local testing with dev client)
+# ── EAS Build (Android & iOS) ──────────────────────────────────────────────
+# Dev build (debug APK for local testing with dev client / iOS simulator)
 npm run build:android:dev
+npm run build:ios:dev
 
-# Preview build (release APK for internal testing)
+# Preview build (release APK / iOS internal distribution)
 npm run build:android:preview
+npm run build:ios:preview
 
-# Production build (AAB for Google Play)
+# Production build (AAB for Google Play / IPA for App Store)
 npm run build:android
+npm run build:ios
 ```
 
 ### First-time backend setup
