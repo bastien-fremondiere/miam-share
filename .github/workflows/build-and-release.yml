@@ -1,0 +1,140 @@
+name: Build and Release (Android & iOS)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile
+        type: choice
+        options:
+          - production
+          - preview
+          - development
+        default: production
+        required: true
+
+jobs:
+  build:
+    name: Build (${{ matrix.platform }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [android, ios]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Determine build profile
+        id: profile
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "value=production" >> $GITHUB_OUTPUT
+          else
+            echo "value=${{ github.event.inputs.profile }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build platform output via EAS
+        id: eas_build
+        run: |
+          BUILD_JSON=$(eas build \
+            --platform ${{ matrix.platform }} \
+            --profile ${{ steps.profile.outputs.value }} \
+            --non-interactive \
+            --json)
+          echo "$BUILD_JSON" | tee build-result.json
+          ARTIFACT_URL=$(echo "$BUILD_JSON" | jq -r '.[0].artifacts.buildUrl // empty')
+          echo "artifact_url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
+        env:
+          EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL || 'https://miam-share.vercel.app' }}
+          EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+          EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID }}
+          EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID }}
+
+      - name: Download artifact from EAS
+        if: steps.eas_build.outputs.artifact_url != ''
+        run: |
+          mkdir -p dist
+          URL="${{ steps.eas_build.outputs.artifact_url }}"
+          PLATFORM="${{ matrix.platform }}"
+          PROFILE="${{ steps.profile.outputs.value }}"
+
+          # Extract extension from URL (e.g., .apk, .aab, .ipa, .tar.gz)
+          CLEAN_URL="${URL%%\?*}"
+          EXT="${CLEAN_URL##*.}"
+          if [[ -z "$EXT" || "$EXT" == "$CLEAN_URL" ]]; then
+            if [[ "$PLATFORM" == "android" ]]; then EXT="aab"; else EXT="ipa"; fi
+          fi
+
+          FILENAME="miam-share-${PLATFORM}-${PROFILE}.${EXT}"
+          curl -L "$URL" -o "dist/${FILENAME}"
+          echo "Downloaded dist/${FILENAME}"
+
+      - name: Upload workflow artifact
+        if: steps.eas_build.outputs.artifact_url != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-asset-${{ matrix.platform }}
+          path: dist/
+          retention-days: 7
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all workflow artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-dist
+          pattern: release-asset-*
+          merge-multiple: true
+
+      - name: Prepare Release Tag & Info
+        id: release_info
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${{ github.ref_name }}"
+          else
+            PKG_VERSION=$(node -p "require('./package.json').version")
+            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+            TAG_NAME="v${PKG_VERSION}-build.${{ github.run_number }}-${SHORT_SHA}"
+          fi
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "Release tag: ${TAG_NAME}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag_name }}
+          name: Miam Share ${{ steps.release_info.outputs.tag_name }}
+          generate_release_notes: true
+          files: release-dist/*
