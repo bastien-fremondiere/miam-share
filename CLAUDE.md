@@ -246,6 +246,10 @@ npm run build:ios:preview
 # Production build (AAB for Google Play / IPA for App Store)
 npm run build:android
 npm run build:ios
+
+# Local builds (using local build capabilities via eas build --local)
+npm run build:android:local
+npm run build:ios:local
 ```
 
 ### First-time backend setup
